@@ -115,6 +115,7 @@ public static class CustomCrestRegistry
             data.DisplayNewIndicator = false;
             data.Slots ??= CloneSlots(source);
             ResizeSlots(data.Slots, source.Slots?.Length ?? 0);
+            SeedMissingEquipsFromSource(data.Slots, source);
         }
 
         _fallbackSaveData[sentinel] = data;
@@ -146,5 +147,26 @@ public static class CustomCrestRegistry
             slots.Add(new ToolCrestsData.SlotData { EquippedTool = "", IsUnlocked = true });
         if (slots.Count > count)
             slots.RemoveRange(count, slots.Count - count);
+    }
+
+    private static void SeedMissingEquipsFromSource(
+        List<ToolCrestsData.SlotData> targetSlots,
+        ToolCrest source)
+    {
+        if (targetSlots.Any(slot => !string.IsNullOrEmpty(slot.EquippedTool)))
+            return;
+
+        var sourceData = default(ToolCrestsData.Data);
+        try { sourceData = source.SaveData; } catch { }
+        if (sourceData.Slots == null) return;
+
+        int count = Math.Min(targetSlots.Count, sourceData.Slots.Count);
+        for (int i = 0; i < count; i++)
+        {
+            var target = targetSlots[i];
+            target.EquippedTool = sourceData.Slots[i].EquippedTool;
+            target.IsUnlocked = sourceData.Slots[i].IsUnlocked;
+            targetSlots[i] = target;
+        }
     }
 }

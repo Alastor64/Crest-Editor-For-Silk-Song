@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using HarmonyLib;
 using UnityEngine;
 
@@ -14,6 +15,7 @@ public sealed class CharmApplier
     private string? _activeId;
     private CustomCharm? _activeCharm;
     private readonly List<(object target, string field, object? value)> _originals = new();
+    private readonly HashSet<string> _diagnosedCharmIds = new();
 
     public void ApplyOverrides(CustomCharm charm, object hero)
     {
@@ -33,6 +35,8 @@ public sealed class CharmApplier
         foreach (var fname in new[] { "configs", "specialConfigs" })
             if (AccessTools.Field(hero.GetType(), fname)?.GetValue(hero) is Array arr)
                 foreach (var g in arr) groups.Add(g);
+
+        DumpCompositionDiagnostics(charm, groups);
 
         int applied = 0;
         foreach (var part in CharmPartNames.NonSlotParts)
@@ -182,9 +186,87 @@ public sealed class CharmApplier
     private static object? GetMember(object obj, string name)
     {
         var t = obj.GetType();
-        var p = AccessTools.Property(t, name);
-        if (p != null && p.CanRead) return p.GetValue(obj, null);
         var f = AccessTools.Field(t, name);
-        return f?.GetValue(obj);
+        if (f != null) return f.GetValue(obj);
+        var p = AccessTools.Property(t, name);
+        return p != null && p.CanRead ? p.GetValue(obj, null) : null;
+    }
+
+    private void DumpCompositionDiagnostics(CustomCharm charm, IReadOnlyList<object> groups)
+    {
+        if (!_diagnosedCharmIds.Add(charm.Id)) return;
+
+        try
+        {
+            Plugin.Log.LogInfo($"[CrestDiag] composition '{charm.Name}' id={charm.Id}");
+            var selections = new List<(CharmPart part, string id)>();
+            if (!string.IsNullOrEmpty(charm.SlotCrestId))
+                selections.Add((CharmPart.Slot, charm.SlotCrestId!));
+            foreach (var part in CharmPartNames.NonSlotParts)
+                if (charm.PartCrestIds.TryGetValue(part.ToString(), out var id))
+                    selections.Add((part, id));
+
+            foreach (var crestGroup in selections.GroupBy(item => item.id))
+            {
+                var cfg = ResolveHeroConfig(crestGroup.Key);
+                var partNames = string.Join("/", crestGroup.Select(item => CharmPartNames.Display(item.part)));
+                Plugin.Log.LogInfo(
+                    $"[CrestDiag] source={crestGroup.Key} parts={partNames} config={cfg?.GetType().Name ?? "null"}");
+                if (cfg != null)
+                    Plugin.Log.LogInfo($"[CrestDiag] clips {crestGroup.Key}: {ReadAnimationClips(cfg)}");
+
+                foreach (var item in crestGroup.Where(item => item.part != CharmPart.Slot))
+                {
+                    var sourceGroup = cfg == null
+                        ? null
+                        : groups.FirstOrDefault(group => ReferenceEquals(GetMember(group, "Config"), cfg));
+                    if (sourceGroup == null) continue;
+                    var values = PartGroupFields.For(item.part)
+                        .Select(field => $"{field}={DescribeMember(GetMember(sourceGroup, field))}");
+                    Plugin.Log.LogInfo(
+                        $"[CrestDiag] group {CharmPartNames.Display(item.part)}: {string.Join(", ", values)}");
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            Plugin.Log.LogWarning($"[CrestDiag] failed: {e}");
+        }
+    }
+
+    private static string ReadAnimationClips(object config)
+    {
+        var lib = GetFieldValue(config, "heroAnimOverrideLib");
+        if (lib == null) return "(none)";
+        if (GetFieldValue(lib, "clips") is not Array clips) return "(clips unavailable)";
+
+        var names = new List<string>(clips.Length);
+        foreach (var clip in clips)
+        {
+            if (clip == null) continue;
+            var name = GetFieldValue(clip, "name") as string ?? "?";
+            var frames = GetFieldValue(clip, "frames") as Array;
+            names.Add($"{name}[{frames?.Length ?? 0}]");
+        }
+        return string.Join(", ", names);
+    }
+
+    private static object? GetFieldValue(object target, string fieldName)
+    {
+        for (Type? type = target.GetType(); type != null; type = type.BaseType)
+        {
+            var field = type.GetField(fieldName,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (field != null) return field.GetValue(target);
+        }
+        return null;
+    }
+
+    private static string DescribeMember(object? value)
+    {
+        if (value == null) return "null";
+        if (value is UnityEngine.Object unityObject)
+            return unityObject == null ? "destroyed" : $"{value.GetType().Name}:{unityObject.name}";
+        return value.ToString() ?? value.GetType().Name;
     }
 }

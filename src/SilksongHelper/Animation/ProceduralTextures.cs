@@ -94,6 +94,14 @@ public static class ProceduralTextures
                         if (dist < 4f) c = Color.Lerp(baseCol, Color.white, 0.7f);
                         break;
                     }
+                    case CharmPart.UpSlash:
+                    {
+                        float rise = Mathf.Lerp(-Size * 0.30f, Size * 0.30f, t);
+                        bool shaft = Mathf.Abs(p.y - rise) < 3f && Mathf.Abs(p.x) < 3f;
+                        bool head = Mathf.Abs(p.y - (rise + 8f)) < 5f && Mathf.Abs(p.x) < 10f;
+                        if (shaft || head) c = baseCol;
+                        break;
+                    }
                 }
 
                 px[y * Size + x] = c;

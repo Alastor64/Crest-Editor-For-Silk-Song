@@ -9,7 +9,7 @@ public sealed class CharmEditor : MonoBehaviour
     private bool _placed;
     private Rect _window = new Rect(40, 40, 880, 640);
     private Vector2 _contentScroll, _slotScroll;
-    private readonly Vector2[] _partScroll = new Vector2[6];
+    private readonly Vector2[] _partScroll = new Vector2[7];
     private Vector2 _previewScroll, _savedScroll;
     private CustomCharm _work = NewCharm();
     private string _nameBuf = "新建纹章";

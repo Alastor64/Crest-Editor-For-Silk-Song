@@ -31,6 +31,7 @@ public sealed class Plugin : BaseUnityPlugin
         Applier = new CharmApplier();
 
         gameObject.AddComponent<CharmEditor>();
+        gameObject.AddComponent<CharmWorkshopUI>();
 
         _harmony = new Harmony(PluginGuid);
         try { _harmony.PatchAll(); }

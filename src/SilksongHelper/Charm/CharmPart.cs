@@ -12,6 +12,7 @@ public enum CharmPart
     DashAttack,
     DownSlashJump,
     PostHealEffect,
+    UpSlash,
 }
 
 public static class CharmPartNames
@@ -25,6 +26,7 @@ public static class CharmPartNames
         CharmPart.DashAttack => "冲刺攻击",
         CharmPart.DownSlashJump => "下劈跳",
         CharmPart.PostHealEffect => "回血（缚丝）后特效",
+        CharmPart.UpSlash => "上劈",
         _ => p.ToString(),
     };
 
@@ -36,6 +38,7 @@ public static class CharmPartNames
         CharmPart.DashAttack,
         CharmPart.DownSlashJump,
         CharmPart.PostHealEffect,
+        CharmPart.UpSlash,
     };
 
     public static readonly IReadOnlyList<CharmPart> All = new[]
@@ -47,6 +50,7 @@ public static class CharmPartNames
         CharmPart.DashAttack,
         CharmPart.DownSlashJump,
         CharmPart.PostHealEffect,
+        CharmPart.UpSlash,
     };
 }
 
@@ -77,6 +81,11 @@ internal static class PartFields
             "downspikeSpeed", "downspikeRecoveryTime", "downspikeThrusts", "downspikeBurstEffect",
         },
         CharmPart.PostHealEffect => new[] { "canPlayNeedolin" },
+        CharmPart.UpSlash => new[]
+        {
+            "upSlashType", "upSlashEvent", "upSlashAnticTime", "upSlashTime",
+            "upSlashSpeed", "upSlashRecoveryTime",
+        },
         _ => Array.Empty<string>(),
     };
 }
@@ -99,6 +108,11 @@ internal static class PartGroupFields
         },
         CharmPart.ChargedAttack => new[] { "ChargeSlash" },
         CharmPart.DashAttack => new[] { "DashStab", "DashStabAlt" },
+        CharmPart.UpSlash => new[]
+        {
+            "<UpSlash>k__BackingField", "<UpSlashDamager>k__BackingField", "UpSlashObject",
+            "<AltUpSlash>k__BackingField", "<AltUpSlashDamager>k__BackingField", "AltUpSlashObject",
+        },
         _ => Array.Empty<string>(),
     };
 }

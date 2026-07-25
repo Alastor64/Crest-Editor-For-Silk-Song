@@ -5,8 +5,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <AssemblyName>inspector</AssemblyName>
-    <GameCoreDir>/mnt/d/Program Files (x86)/steam/steamapps/common/Hollow Knight Silksong/BepInEx/core</GameCoreDir>
-    <ManagedDir>/mnt/d/Program Files (x86)/steam/steamapps/common/Hollow Knight Silksong/Hollow Knight Silksong_Data/Managed</ManagedDir>
+    <GameCoreDir>$(BepInExCoreDir)</GameCoreDir>
   </PropertyGroup>
 
   <ItemGroup>

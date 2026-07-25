@@ -235,12 +235,12 @@ public static class CrestCatalog
         var cfgType = AccessTools.TypeByName("HeroControllerConfig");
         var data = new[]
         {
-            ("wanderer", "漫游者纹章", 3, new (string, object)[] { ("canBind", true), ("canNailCharge", false), ("downSlashType", 1) }),
-            ("warrior", "野兽纹章", 4, new (string, object)[] { ("canBind", true), ("canNailCharge", true), ("downSlashType", 2) }),
-            ("reaper", "收割者纹章", 3, new (string, object)[] { ("canBrolly", true), ("canHarpoonDash", true), ("downSlashType", 1) }),
-            ("hunter", "猎手纹章", 3, new (string, object)[] { ("canPlayNeedolin", true), ("canNailCharge", false), ("downSlashType", 0) }),
-            ("witch", "巫女纹章", 3, new (string, object)[] { ("canBind", false), ("canBrolly", true), ("canHarpoonDash", false) }),
-            ("toolmaster", "工匠纹章", 4, new (string, object)[] { ("canNailCharge", true), ("canPlayNeedolin", true), ("downSlashType", 2) }),
+            ("wanderer", "漫游者纹章", 3, new (string, object)[] { ("canBind", true), ("canNailCharge", false), ("downSlashType", 1), ("upSlashType", 1) }),
+            ("warrior", "野兽纹章", 4, new (string, object)[] { ("canBind", true), ("canNailCharge", true), ("downSlashType", 2), ("upSlashType", 2) }),
+            ("reaper", "收割者纹章", 3, new (string, object)[] { ("canBrolly", true), ("canHarpoonDash", true), ("downSlashType", 1), ("upSlashType", 1) }),
+            ("hunter", "猎手纹章", 3, new (string, object)[] { ("canPlayNeedolin", true), ("canNailCharge", false), ("downSlashType", 0), ("upSlashType", 0) }),
+            ("witch", "巫女纹章", 3, new (string, object)[] { ("canBind", false), ("canBrolly", true), ("canHarpoonDash", false), ("upSlashType", 1) }),
+            ("toolmaster", "工匠纹章", 4, new (string, object)[] { ("canNailCharge", true), ("canPlayNeedolin", true), ("downSlashType", 2), ("upSlashType", 2) }),
         };
         var list = new List<CrestInfo>();
         foreach (var (id, name, slots, overrides) in data)

@@ -35,15 +35,14 @@ internal static class CrestIdentityPatches
         return Plugin.Applier.UsesCrestFor(_identityPart.Value, crestId);
     }
 
-    [HarmonyPatch(typeof(ToolBase), nameof(ToolBase.IsEquipped), MethodType.Getter)]
-    internal static class ToolBaseIsEquippedPatch
+    [HarmonyPatch(typeof(ToolCrest), nameof(ToolCrest.IsEquipped), MethodType.Getter)]
+    internal static class ToolCrestIsEquippedPatch
     {
-        internal static void Postfix(ToolBase __instance, ref bool __result)
+        internal static void Postfix(ToolCrest __instance, ref bool __result)
         {
             if (_identityPart == null || Plugin.Applier?.ActiveCharm == null)
                 return;
-            if (__instance is ToolCrest crest)
-                __result = SelectedMatches(crest.name);
+            __result = SelectedMatches(__instance.name);
         }
     }
 
@@ -74,6 +73,16 @@ internal static class CrestIdentityPatches
     {
         internal static void Prefix(out CharmPart? __state)
             => Enter(CharmPart.PostHealEffect, out __state);
+
+        internal static Exception? Finalizer(Exception? __exception, CharmPart? __state)
+            => Exit(__exception, __state);
+    }
+
+    [HarmonyPatch(typeof(BindOrbHudFrame), "DoChangeFrame")]
+    internal static class HudIdentityScope
+    {
+        internal static void Prefix(out CharmPart? __state)
+            => Enter(CharmPart.Slot, out __state);
 
         internal static Exception? Finalizer(Exception? __exception, CharmPart? __state)
             => Exit(__exception, __state);

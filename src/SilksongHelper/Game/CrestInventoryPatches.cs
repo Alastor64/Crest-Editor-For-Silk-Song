@@ -71,6 +71,27 @@ internal static class CrestInventoryPatches
         }
     }
 
+    [HarmonyPatch(typeof(ToolCrest), nameof(ToolCrest.IsUnlocked), MethodType.Getter)]
+    internal static class ToolCrestIsUnlockedPatch
+    {
+        internal static void Postfix(ToolCrest __instance, ref bool __result)
+        {
+            if (__instance != null && CustomCrestRegistry.IsSentinel(__instance.name))
+                __result = true;
+        }
+    }
+
+    [HarmonyPatch(typeof(ToolCrest), nameof(ToolCrest.SaveData), MethodType.Getter)]
+    internal static class ToolCrestSaveDataPatch
+    {
+        internal static void Postfix(ToolCrest __instance, ref ToolCrestsData.Data __result)
+        {
+            if (__result.Slots != null || __instance == null) return;
+            var fallback = CustomCrestRegistry.SaveDataFor(__instance.name);
+            if (fallback.HasValue) __result = fallback.Value;
+        }
+    }
+
     [HarmonyPatch(typeof(HeroController), "ResetAllCrestState", typeof(bool))]
     internal static class ResetCrestStatePatch
     {
@@ -98,7 +119,7 @@ internal static class CrestInventoryPatches
             var t = AccessTools.TypeByName("PlayerData");
             if (t == null) return null;
             object? inst = null;
-            foreach (var n in new[] { "Instance", "instance", "current", "Current" })
+            foreach (var n in new[] { "instance", "_instance", "Instance", "current", "Current" })
             {
                 try
                 {
@@ -130,6 +151,33 @@ internal static class CrestInventoryPatches
             if (inst == null) return null;
             try { return AccessTools.Field(t, "CurrentCrestID")?.GetValue(inst) as string; }
             catch { return null; }
+        }
+    }
+
+    [HarmonyPatch(typeof(ToolItemManager), nameof(ToolItemManager.SetEquippedCrest))]
+    internal static class SetEquippedCrestPatch
+    {
+        internal static void Postfix()
+        {
+            try
+            {
+                var currentId = PlayerData.instance?.CurrentCrestID;
+                if (!CustomCrestRegistry.IsSentinel(currentId)) return;
+
+                var hero = HeroController.instance;
+                if (hero == null) return;
+
+                // The inventory refresh is not guaranteed to call the same
+                // ResetAllCrestState overload on every game version. Invoke the
+                // known reset point immediately after committing the crest ID.
+                var reset = AccessTools.Method(typeof(HeroController),
+                    "ResetAllCrestState", new[] { typeof(bool) });
+                reset?.Invoke(hero, new object[] { false });
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogWarning($"apply equipped custom crest: {e.Message}");
+            }
         }
     }
 }

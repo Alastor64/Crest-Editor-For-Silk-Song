@@ -11,6 +11,7 @@ public static class CustomCrestRegistry
     public const string Prefix = "__silksong_custom__";
 
     private static readonly Dictionary<string, ToolCrest> _byName = new();
+    private static readonly Dictionary<string, ToolCrestsData.Data> _fallbackSaveData = new();
     private static bool _dirty = true;
 
     public static void MarkDirty() => _dirty = true;
@@ -40,10 +41,13 @@ public static class CustomCrestRegistry
             {
                 var clone = UnityEngine.Object.Instantiate(crest);
                 clone.name = SentinelFor(charm.Id);
+                EnsureSaveData(clone, crest);
                 _byName[clone.name] = clone;
             }
             catch (Exception e) { Plugin.Log.LogWarning($"build synthetic crest for '{charm.Name}': {e}"); }
         }
+
+        Plugin.Log.LogInfo($"custom crest registry rebuilt: {_byName.Count} crest(s).");
     }
 
     private static ToolCrest? ResolveSlotCrest(string? id)
@@ -64,11 +68,83 @@ public static class CustomCrestRegistry
 
     public static IReadOnlyCollection<ToolCrest> All => _byName.Values;
 
+    public static ToolCrestsData.Data? SaveDataFor(string? name)
+        => IsSentinel(name) && _fallbackSaveData.TryGetValue(name!, out var data) ? data : null;
+
     public static string? CustomNameFor(ToolCrest? crestData)
     {
         if (crestData == null) return null;
         var id = IdFromSentinel(crestData.name);
         if (id == null) return null;
         return Plugin.SaveData.Charms.FirstOrDefault(c => c.Id == id)?.Name;
+    }
+
+    private static void EnsureSaveData(ToolCrest clone, ToolCrest source)
+    {
+        var sentinel = clone.name;
+        var data = default(ToolCrestsData.Data);
+        var hasData = false;
+        try
+        {
+            var equips = PlayerData.instance?.ToolEquips;
+            if (equips != null)
+            {
+                data = equips.GetData(sentinel);
+                hasData = data.Slots != null;
+            }
+        }
+        catch { }
+
+        if (!hasData)
+        {
+            data = new ToolCrestsData.Data
+            {
+                IsUnlocked = true,
+                DisplayNewIndicator = false,
+                Slots = CloneSlots(source),
+            };
+            try { PlayerData.instance?.ToolEquips?.SetData(sentinel, data); }
+            catch (Exception e)
+            {
+                Plugin.Log.LogWarning($"create custom crest save data '{sentinel}': {e.Message}");
+            }
+        }
+        else
+        {
+            data.IsUnlocked = true;
+            data.DisplayNewIndicator = false;
+            data.Slots ??= CloneSlots(source);
+            ResizeSlots(data.Slots, source.Slots?.Length ?? 0);
+        }
+
+        _fallbackSaveData[sentinel] = data;
+    }
+
+    private static List<ToolCrestsData.SlotData> CloneSlots(ToolCrest source)
+    {
+        var result = new List<ToolCrestsData.SlotData>();
+        var sourceData = default(ToolCrestsData.Data);
+        try { sourceData = source.SaveData; } catch { }
+        int count = source.Slots?.Length ?? 0;
+        for (int i = 0; i < count; i++)
+        {
+            var sourceSlot = sourceData.Slots != null && i < sourceData.Slots.Count
+                ? sourceData.Slots[i]
+                : default;
+            result.Add(new ToolCrestsData.SlotData
+            {
+                EquippedTool = "",
+                IsUnlocked = sourceData.Slots == null ? true : sourceSlot.IsUnlocked,
+            });
+        }
+        return result;
+    }
+
+    private static void ResizeSlots(List<ToolCrestsData.SlotData> slots, int count)
+    {
+        while (slots.Count < count)
+            slots.Add(new ToolCrestsData.SlotData { EquippedTool = "", IsUnlocked = true });
+        if (slots.Count > count)
+            slots.RemoveRange(count, slots.Count - count);
     }
 }

@@ -63,7 +63,9 @@ public static class CrestCatalog
             var opts = new List<CrestPartOption>();
             foreach (var c in list)
             {
-                if (part != CharmPart.Slot && c.HeroConfig == null)
+                if (part != CharmPart.Slot
+                    && !PartBehaviour.UsesCrestIdentity(part)
+                    && c.HeroConfig == null)
                     continue;
                 opts.Add(BuildOption(c, part));
             }

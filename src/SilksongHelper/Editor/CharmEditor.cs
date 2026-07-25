@@ -27,6 +27,12 @@ public sealed class CharmEditor : MonoBehaviour
     private Vector2 _dragStartMouse;
     private Vector2 _dragStartPos;
 
+    private float _savedTimeScale = 1f;
+    private bool _savedCursorVisible = true;
+    private CursorLockMode _savedCursorLock;
+    private bool _didPause;
+    private object? _eventSystem;
+
     private GUIStyle? _bold, _small, _red;
     private GUIStyle Bold => _bold ??= new GUIStyle(GUI.skin.label) { fontStyle = FontStyle.Bold, fontSize = 18 };
     private GUIStyle Small => _small ??= new GUIStyle(GUI.skin.label) { fontSize = 13, richText = true };
@@ -51,25 +57,119 @@ public sealed class CharmEditor : MonoBehaviour
             {
                 _visible = !_visible;
                 _lastToggle = now;
-                if (_visible)
-                {
-                    if (!_placed)
-                    {
-                        float w = Screen.width * 0.5f;
-                        float h = Screen.height * 0.5f;
-                        _window = new Rect(Screen.width * 0.25f, Screen.height * 0.15f, w, h);
-                        _placed = true;
-                    }
-                    CrestCatalog.EnsureLoaded();
-                }
+                if (_visible) OpenEditor();
+                else CloseEditor();
             }
         }
         if (!_visible)
             return;
 
+        var oldDepth = GUI.depth;
+        GUI.depth = -100;
+
         CrestCatalog.EnsureLoaded();
-        HandleWindowInteraction(e);
+        if (e != null) HandleWindowInteraction(e);
         DrawCustomWindow();
+
+        BlockGameInput(e);
+
+        GUI.depth = oldDepth;
+    }
+
+    private void OpenEditor()
+    {
+        if (!_placed)
+        {
+            float w = Screen.width * 0.5f;
+            float h = Screen.height * 0.5f;
+            _window = new Rect(Screen.width * 0.25f, Screen.height * 0.15f, w, h);
+            _placed = true;
+        }
+        CrestCatalog.EnsureLoaded();
+
+        _didPause = Time.timeScale > 0f;
+        if (_didPause) _savedTimeScale = Time.timeScale;
+        _savedCursorVisible = Cursor.visible;
+        _savedCursorLock = Cursor.lockState;
+
+        Time.timeScale = 0f;
+
+        var esType = System.Type.GetType("UnityEngine.EventSystems.EventSystem, UnityEngine.UI", throwOnError: false);
+        if (esType != null)
+        {
+            _eventSystem = FindObjectOfType(esType);
+            if (_eventSystem != null)
+            {
+                var prop = esType.GetProperty("enabled");
+                if (prop != null) prop.SetValue(_eventSystem, false);
+            }
+        }
+    }
+
+    private void CloseEditor()
+    {
+        if (_didPause)
+        {
+            Time.timeScale = _savedTimeScale;
+            _didPause = false;
+        }
+        Cursor.visible = _savedCursorVisible;
+        Cursor.lockState = _savedCursorLock;
+
+        if (_eventSystem != null)
+        {
+            var esType = System.Type.GetType("UnityEngine.EventSystems.EventSystem, UnityEngine.UI", throwOnError: false);
+            if (esType != null)
+            {
+                var prop = esType.GetProperty("enabled");
+                if (prop != null) prop.SetValue(_eventSystem, true);
+            }
+            _eventSystem = null;
+        }
+    }
+
+    private void BlockGameInput(Event? e)
+    {
+        if (e == null) return;
+        switch (e.type)
+        {
+            case EventType.Repaint:
+            case EventType.Layout:
+            case EventType.Ignore:
+            case EventType.Used:
+                return;
+        }
+        if (e.type == EventType.KeyDown || e.type == EventType.KeyUp)
+        {
+            if (e.keyCode == Plugin.ToggleKey.Value)
+                return;
+        }
+        e.Use();
+    }
+
+    private void Update()
+    {
+        if (!_visible) return;
+
+        if (_didPause && Time.timeScale > 0f)
+            Time.timeScale = 0f;
+
+        if (_eventSystem != null)
+        {
+            var esType = System.Type.GetType("UnityEngine.EventSystems.EventSystem, UnityEngine.UI", throwOnError: false);
+            if (esType != null)
+            {
+                var prop = esType.GetProperty("enabled");
+                if (prop != null)
+                {
+                    if ((bool)(prop.GetValue(_eventSystem) ?? false))
+                        prop.SetValue(_eventSystem, false);
+                }
+            }
+        }
+
+        Cursor.visible = true;
+        Cursor.lockState = CursorLockMode.None;
     }
 
     private void HandleWindowInteraction(Event e)

@@ -23,3 +23,4 @@
 (可能有)windows内游戏目录D:\Program Files (x86)\steam\steamapps\common\Hollow Knight Silksong
 (可能是)wsl密码：998244353
 原版游戏中文wiki：https://hkss.huijiwiki.com/wiki/%E7%A9%BA%E6%B4%9E%E9%AA%91%E5%A3%AB%EF%BC%9A%E4%B8%9D%E4%B9%8B%E6%AD%8C
+每次对话完build项目，并将结果放到游戏对应文件夹下（D:\Program Files (x86)\steam\steamapps\common\Hollow Knight Silksong\BepInEx\plugins\SilksongHelper）

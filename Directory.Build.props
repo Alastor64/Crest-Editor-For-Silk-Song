@@ -1,0 +1,11 @@
+<Project>
+
+  <PropertyGroup Label="GamePaths">
+    <GameDir Condition="'$(GameDir)' == ''">/mnt/d/Program Files (x86)/steam/steamapps/common/Hollow Knight Silksong</GameDir>
+    <ManagedDir>$(GameDir)/Hollow Knight Silksong_Data/Managed</ManagedDir>
+    <BepInExDir>$(GameDir)/BepInEx</BepInExDir>
+    <BepInExCoreDir>$(BepInExDir)/core</BepInExCoreDir>
+    <PluginsDir>$(BepInExDir)/plugins/$(MSBuildProjectName)</PluginsDir>
+  </PropertyGroup>
+
+</Project>

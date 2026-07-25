@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using HarmonyLib;
+using UnityEngine;
 
 namespace SilksongHelper;
 
@@ -77,7 +78,7 @@ internal static class CrestInventoryPatches
         {
             try
             {
-                var id = GameRefs.Instance.Get("PlayerData", "CurrentCrestID") as string;
+                var id = CurrentCrestId();
                 var customId = CustomCrestRegistry.IdFromSentinel(id);
                 if (customId != null)
                 {
@@ -90,6 +91,45 @@ internal static class CrestInventoryPatches
                 }
             }
             catch (Exception e) { Plugin.Log.LogWarning($"ResetAllCrestState postfix: {e.Message}"); }
+        }
+
+        private static string? CurrentCrestId()
+        {
+            var t = AccessTools.TypeByName("PlayerData");
+            if (t == null) return null;
+            object? inst = null;
+            foreach (var n in new[] { "Instance", "instance", "current", "Current" })
+            {
+                try
+                {
+                    var p = AccessTools.Property(t, n);
+                    if (p != null && p.GetGetMethod(nonPublic: true) != null)
+                    {
+                        var v = p.GetValue(null, null);
+                        if (v is UnityEngine.Object u && u == null) continue;
+                        if (v != null) { inst = v; break; }
+                    }
+                }
+                catch { }
+                try
+                {
+                    var f = AccessTools.Field(t, n);
+                    if (f != null && f.IsStatic)
+                    {
+                        var v = f.GetValue(null);
+                        if (v is UnityEngine.Object u2 && u2 == null) continue;
+                        if (v != null) { inst = v; break; }
+                    }
+                }
+                catch { }
+            }
+            if (inst == null)
+            {
+                try { inst = UnityEngine.Object.FindObjectOfType(t); } catch { }
+            }
+            if (inst == null) return null;
+            try { return AccessTools.Field(t, "CurrentCrestID")?.GetValue(inst) as string; }
+            catch { return null; }
         }
     }
 }

@@ -17,12 +17,15 @@ public sealed class CharmEditor : MonoBehaviour
     private const float Edge = 8f;
     private const float TitleH = 28f;
     private const float MinW = 640f, MinH = 480f;
-    private const int ResizeControlId = 0x5C1A;
 
     private enum ResizeEdge { None, N, S, E, W, NE, NW, SE, SW }
     private ResizeEdge _resizeEdge = ResizeEdge.None;
-    private Vector2 _resizeAnchorScreen;
+    private Vector2 _resizeAnchor;
     private Rect _resizeStartRect;
+
+    private bool _isDragging;
+    private Vector2 _dragStartMouse;
+    private Vector2 _dragStartPos;
 
     private GUIStyle? _bold, _small, _red;
     private GUIStyle Bold => _bold ??= new GUIStyle(GUI.skin.label) { fontStyle = FontStyle.Bold, fontSize = 18 };
@@ -64,53 +67,72 @@ public sealed class CharmEditor : MonoBehaviour
         if (!_visible)
             return;
 
-        HandleResize();
-        _window = GUI.Window(GetInstanceID(), _window, DrawWindow, "");
+        CrestCatalog.EnsureLoaded();
+        HandleWindowInteraction(e);
+        DrawCustomWindow();
     }
 
-    private void HandleResize()
+    private void HandleWindowInteraction(Event e)
     {
-        var e = Event.current;
-        if (e == null) return;
-
-        var hot = GUIUtility.hotControl;
-
-        if (_resizeEdge == ResizeEdge.None)
+        if (_resizeEdge != ResizeEdge.None)
         {
-            if (e.type != EventType.MouseDown || e.button != 0)
-                return;
-            var local = e.mousePosition - _window.position;
-            var edge = HitResize(local, _window.width, _window.height);
-            if (edge == ResizeEdge.None)
-                return;
+            if (e.type == EventType.MouseDrag)
+            {
+                ApplyResize(e.mousePosition);
+                e.Use();
+            }
+            else if (e.type == EventType.MouseUp)
+            {
+                _resizeEdge = ResizeEdge.None;
+                e.Use();
+            }
+            return;
+        }
+
+        if (_isDragging)
+        {
+            if (e.type == EventType.MouseDrag)
+            {
+                _window.x = _dragStartPos.x + (e.mousePosition.x - _dragStartMouse.x);
+                _window.y = _dragStartPos.y + (e.mousePosition.y - _dragStartMouse.y);
+                e.Use();
+            }
+            else if (e.type == EventType.MouseUp)
+            {
+                _isDragging = false;
+                e.Use();
+            }
+            return;
+        }
+
+        if (e.type != EventType.MouseDown || e.button != 0)
+            return;
+
+        var local = e.mousePosition - _window.position;
+        var titleRect = new Rect(0, Edge, _window.width, TitleH - Edge);
+        if (titleRect.Contains(local))
+        {
+            _isDragging = true;
+            _dragStartMouse = e.mousePosition;
+            _dragStartPos = new Vector2(_window.x, _window.y);
+            e.Use();
+            return;
+        }
+
+        var edge = HitResize(local, _window.width, _window.height);
+        if (edge != ResizeEdge.None)
+        {
             _resizeEdge = edge;
-            _resizeAnchorScreen = e.mousePosition;
+            _resizeAnchor = e.mousePosition;
             _resizeStartRect = new Rect(_window);
-            GUIUtility.hotControl = ResizeControlId;
-            e.Use();
-            return;
-        }
-
-        if (hot != ResizeControlId)
-            return;
-
-        if (e.type == EventType.MouseDrag)
-        {
-            ApplyResize(e.mousePosition);
-            e.Use();
-        }
-        else if (e.type == EventType.MouseUp)
-        {
-            _resizeEdge = ResizeEdge.None;
-            GUIUtility.hotControl = 0;
             e.Use();
         }
     }
 
     private void ApplyResize(Vector2 screenMouse)
     {
-        float dx = screenMouse.x - _resizeAnchorScreen.x;
-        float dy = screenMouse.y - _resizeAnchorScreen.y;
+        float dx = screenMouse.x - _resizeAnchor.x;
+        float dy = screenMouse.y - _resizeAnchor.y;
         var r = new Rect(_resizeStartRect);
         var edge = _resizeEdge;
 
@@ -159,58 +181,67 @@ public sealed class CharmEditor : MonoBehaviour
         return ResizeEdge.None;
     }
 
-    private void DrawWindow(int id)
+    private void DrawCustomWindow()
     {
-        CrestCatalog.EnsureLoaded();
+        GUI.Box(_window, "", GUI.skin.window);
 
-        GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.Height(TitleH));
-        GUI.Label(new Rect(12, 4, _window.width - 20, 22),
-            $"丝之歌助手 — 自定义纹章编辑器  ({_work.SlotCount}槽)", Bold);
-
-        using (var s = new GUILayout.ScrollViewScope(_contentScroll,
-            GUILayout.ExpandHeight(true), GUILayout.ExpandWidth(true)))
+        var contentRect = new Rect(_window.x, _window.y + TitleH,
+            _window.width, _window.height - TitleH);
+        GUILayout.BeginArea(contentRect);
+        try
         {
-            _contentScroll = s.scrollPosition;
-            DrawTopBar();
-            DrawOptionRow(CharmPart.Slot, ref _slotScroll,
-                () => _work.SlotCrestId, v => _work.SlotCrestId = v);
-
-            int si = 0;
-            foreach (var part in CharmPartNames.NonSlotParts)
+            using (var s = new GUILayout.ScrollViewScope(_contentScroll,
+                GUILayout.ExpandHeight(true), GUILayout.ExpandWidth(true)))
             {
-                var idx = si;
-                DrawOptionRow(part, ref _partScroll[idx],
-                    () => _work.PartCrestIds.TryGetValue(part.ToString(), out var v) ? v : null,
-                    v =>
-                    {
-                        if (v == null) _work.PartCrestIds.Remove(part.ToString());
-                        else _work.PartCrestIds[part.ToString()] = v;
-                    });
-                si++;
-            }
+                _contentScroll = s.scrollPosition;
+                DrawTopBar();
+                DrawOptionRow(CharmPart.Slot, ref _slotScroll,
+                    () => _work.SlotCrestId, v => _work.SlotCrestId = v);
 
-            DrawPreview();
-            GUILayout.Space(4);
-            DrawSavedList();
+                int si = 0;
+                foreach (var part in CharmPartNames.NonSlotParts)
+                {
+                    var idx = si;
+                    DrawOptionRow(part, ref _partScroll[idx],
+                        () => _work.PartCrestIds.TryGetValue(part.ToString(), out var v) ? v : null,
+                        v =>
+                        {
+                            if (v == null) _work.PartCrestIds.Remove(part.ToString());
+                            else _work.PartCrestIds[part.ToString()] = v;
+                        });
+                    si++;
+                }
+
+                DrawPreview();
+                GUILayout.Space(4);
+                DrawSavedList();
+            }
+        }
+        finally
+        {
+            GUILayout.EndArea();
         }
 
-        DrawResizeVisuals();
-        GUI.DragWindow(new Rect(0, Edge, _window.width, TitleH - Edge));
+        GUI.Label(new Rect(_window.x + 12, _window.y + 4, _window.width - 20, 22),
+            $"丝之歌助手 — 自定义纹章编辑器  ({_work.SlotCount}槽)", Bold);
+
+        if (Event.current.type == EventType.Repaint)
+            DrawResizeVisuals();
     }
 
     private void DrawResizeVisuals()
     {
-        if (Event.current.type != EventType.Repaint)
-            return;
         var w = _window.width;
         var h = _window.height;
+        var x = _window.x;
+        var y = _window.y;
         var dim = new Color(1f, 1f, 1f, 0.55f);
         var old = GUI.color;
         GUI.color = dim;
-        GUI.Label(new Rect(w - 14, h - 14, 14, 14), "◢", Small);
-        GUI.Label(new Rect(2, 2, 10, 10), "◣", Small);
-        GUI.Label(new Rect(w - 12, 2, 10, 10), "◢", Small);
-        GUI.Label(new Rect(2, h - 12, 10, 10), "◤", Small);
+        GUI.Label(new Rect(x + w - 14, y + h - 14, 14, 14), "◢", Small);
+        GUI.Label(new Rect(x + 2, y + 2, 10, 10), "◣", Small);
+        GUI.Label(new Rect(x + w - 12, y + 2, 10, 10), "◢", Small);
+        GUI.Label(new Rect(x + 2, y + h - 12, 10, 10), "◤", Small);
         GUI.color = old;
     }
 

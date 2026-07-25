@@ -3,6 +3,8 @@ using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
 using System;
+using System.Linq;
+using System.Reflection;
 using UnityEngine;
 
 namespace SilksongHelper;
@@ -34,8 +36,7 @@ public sealed class Plugin : BaseUnityPlugin
         gameObject.AddComponent<CharmWorkshopUI>();
 
         _harmony = new Harmony(PluginGuid);
-        try { _harmony.PatchAll(); }
-        catch (Exception e) { Log.LogError($"Harmony PatchAll failed: {e}"); }
+        InstallHarmonyPatches(_harmony);
 
         Log.LogInfo($"{PluginName} {PluginVersion} 已就绪。按 {ToggleKey.Value} 打开编辑器。");
     }
@@ -44,5 +45,27 @@ public sealed class Plugin : BaseUnityPlugin
     {
         Applier?.RestoreOverrides();
         _harmony?.UnpatchSelf();
+    }
+
+    private static void InstallHarmonyPatches(Harmony harmony)
+    {
+        int installed = 0;
+        int failed = 0;
+        foreach (var type in typeof(Plugin).Assembly.GetTypes()
+                     .Where(t => t.GetCustomAttributes(typeof(HarmonyPatch), true).Length > 0))
+        {
+            try
+            {
+                harmony.CreateClassProcessor(type).Patch();
+                installed++;
+            }
+            catch (Exception e)
+            {
+                failed++;
+                Log.LogError($"Harmony patch class failed: {type.FullName}: {e}");
+            }
+        }
+
+        Log.LogInfo($"Harmony patch classes installed={installed}, failed={failed}.");
     }
 }

@@ -106,14 +106,14 @@ internal static class CrestIdentityPatches
                 }
             }
 
-            AddIfFound(typeof(DamageEnemies), "DoDamage", out var damage);
-            if (damage != null) yield return damage;
-            AddIfFound(typeof(HealthManager), "TakeDamage", out var health);
-            if (health != null) yield return health;
-            AddIfFound(typeof(ActiveCorpse), "DoQueuedBurnEffects", out var corpse);
-            if (corpse != null) yield return corpse;
-            AddIfFound(typeof(HeroShamanRuneEffect), "Refresh", out var shaman);
-            if (shaman != null) yield return shaman;
+            foreach (var method in NamedMethods(typeof(DamageEnemies), "DoDamage"))
+                yield return method;
+            foreach (var method in NamedMethods(typeof(HealthManager), "TakeDamage"))
+                yield return method;
+            foreach (var method in NamedMethods(typeof(ActiveCorpse), "DoQueuedBurnEffects"))
+                yield return method;
+            foreach (var method in NamedMethods(typeof(HeroShamanRuneEffect), "Refresh"))
+                yield return method;
         }
 
         internal static void Prefix(out CharmPart? __state)
@@ -122,8 +122,12 @@ internal static class CrestIdentityPatches
         internal static Exception? Finalizer(Exception? __exception, CharmPart? __state)
             => Exit(__exception, __state);
 
-        private static void AddIfFound(Type type, string name, out MethodBase? method)
-            => method = AccessTools.Method(type, name);
+        private static IEnumerable<MethodBase> NamedMethods(Type type, string name)
+        {
+            foreach (var method in AccessTools.GetDeclaredMethods(type))
+                if (method.Name == name && !method.IsAbstract)
+                    yield return method;
+        }
     }
 
     [HarmonyPatch(typeof(HeroController), "IsHunterCrestEquipped")]

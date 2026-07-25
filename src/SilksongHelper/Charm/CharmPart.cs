@@ -13,6 +13,7 @@ public enum CharmPart
     DownSlashJump,
     PostHealEffect,
     UpSlash,
+    SpecialSkill,
 }
 
 public static class CharmPartNames
@@ -27,6 +28,7 @@ public static class CharmPartNames
         CharmPart.DownSlashJump => "下劈跳",
         CharmPart.PostHealEffect => "回血（缚丝）后特效",
         CharmPart.UpSlash => "上劈",
+        CharmPart.SpecialSkill => "特殊技能",
         _ => p.ToString(),
     };
 
@@ -39,6 +41,7 @@ public static class CharmPartNames
         CharmPart.DownSlashJump,
         CharmPart.PostHealEffect,
         CharmPart.UpSlash,
+        CharmPart.SpecialSkill,
     };
 
     public static readonly IReadOnlyList<CharmPart> All = new[]
@@ -51,6 +54,7 @@ public static class CharmPartNames
         CharmPart.DownSlashJump,
         CharmPart.PostHealEffect,
         CharmPart.UpSlash,
+        CharmPart.SpecialSkill,
     };
 }
 
@@ -80,12 +84,11 @@ internal static class PartFields
             "downSlashType", "downSlashEvent", "downspikeAnticTime", "downspikeTime",
             "downspikeSpeed", "downspikeRecoveryTime", "downspikeThrusts", "downspikeBurstEffect",
         },
-        CharmPart.PostHealEffect => new[] { "canPlayNeedolin" },
-        CharmPart.UpSlash => new[]
-        {
-            "upSlashType", "upSlashEvent", "upSlashAnticTime", "upSlashTime",
-            "upSlashSpeed", "upSlashRecoveryTime",
-        },
+        // These behaviours are selected by crest identity in the game's
+        // HeroController/FSM code rather than by HeroControllerConfig fields.
+        CharmPart.PostHealEffect => Array.Empty<string>(),
+        CharmPart.UpSlash => Array.Empty<string>(),
+        CharmPart.SpecialSkill => Array.Empty<string>(),
         _ => Array.Empty<string>(),
     };
 }
@@ -117,3 +120,10 @@ internal static class PartGroupFields
     };
 }
 
+internal static class PartBehaviour
+{
+    public static bool UsesCrestIdentity(CharmPart part)
+        => part == CharmPart.HealMethod
+           || part == CharmPart.PostHealEffect
+           || part == CharmPart.SpecialSkill;
+}

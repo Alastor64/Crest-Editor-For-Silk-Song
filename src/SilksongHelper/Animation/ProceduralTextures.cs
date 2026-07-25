@@ -102,6 +102,18 @@ public static class ProceduralTextures
                         if (shaft || head) c = baseCol;
                         break;
                     }
+                    case CharmPart.SpecialSkill:
+                    {
+                        float pulse = 0.55f + 0.25f * Mathf.Sin(t * Mathf.PI * 2f);
+                        for (int i = 0; i < 4; i++)
+                        {
+                            float a = i * Mathf.PI * 0.5f + t * Mathf.PI * 2f;
+                            Vector2 d = new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * Size * pulse * 0.28f;
+                            if ((p - d).magnitude < 4f) c = Color.Lerp(baseCol, Color.white, 0.65f);
+                        }
+                        if (dist < 5f) c = baseCol;
+                        break;
+                    }
                 }
 
                 px[y * Size + x] = c;

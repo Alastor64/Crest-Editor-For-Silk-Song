@@ -9,14 +9,16 @@ namespace SilksongHelper;
 public sealed class CharmApplier
 {
     public string? ActiveCharmId => _activeId;
+    public CustomCharm? ActiveCharm => _activeCharm;
 
     private string? _activeId;
+    private CustomCharm? _activeCharm;
     private readonly List<(object target, string field, object? value)> _originals = new();
-    private readonly List<GameObject> _activatedRoots = new();
 
     public void ApplyOverrides(CustomCharm charm, object hero)
     {
-        if (_activeId == charm.Id) return;
+        // ResetAllCrestState can run more than once while the same crest remains
+        // equipped. Always rebuild the composition after vanilla resets it.
         RestoreOverrides();
 
         var active = AccessTools.Property(hero.GetType(), "CurrentConfigGroup")?.GetValue(hero);
@@ -48,18 +50,15 @@ public sealed class CharmApplier
             if (srcGroup != null)
             {
                 applied += CopyFields(active, srcGroup, PartGroupFields.For(part));
-                ActivateRoot(srcGroup);
             }
 
             if (activeConfig != null)
-            {
                 applied += CopyFields(activeConfig, srcCfg, PartFields.For(part));
-                applied += CopyAnimLib(activeConfig, srcCfg);
-            }
         }
 
         _activeId = charm.Id;
-        RefreshAnimation(hero, activeConfig);
+        _activeCharm = charm;
+        RefreshConfigGroup(hero, active);
         Plugin.Log.LogInfo($"applied custom charm overrides '{charm.Name}' ({applied} fields).");
     }
 
@@ -73,7 +72,7 @@ public sealed class CharmApplier
 
     public void RestoreOverrides()
     {
-        if (_activeId == null && _originals.Count == 0 && _activatedRoots.Count == 0) return;
+        if (_activeId == null && _originals.Count == 0) return;
         foreach (var (target, field, value) in _originals)
         {
             try
@@ -84,12 +83,8 @@ public sealed class CharmApplier
             catch (Exception e) { Plugin.Log.LogWarning($"restore {field}: {e.Message}"); }
         }
         _originals.Clear();
-        foreach (var go in _activatedRoots)
-        {
-            try { if (go != null) go.SetActive(false); } catch { }
-        }
-        _activatedRoots.Clear();
         _activeId = null;
+        _activeCharm = null;
     }
 
     private int CopyFields(object target, object source, IReadOnlyList<string> names)
@@ -107,43 +102,33 @@ public sealed class CharmApplier
         return n;
     }
 
-    private int CopyAnimLib(object targetConfig, object sourceConfig)
+    public string? SelectedCrestId(CharmPart part)
     {
-        const string field = "heroAnimOverrideLib";
-        var fi = AccessTools.Field(targetConfig.GetType(), field);
-        if (fi == null) return 0;
-        var srcLib = fi.GetValue(sourceConfig);
-        if (srcLib == null) return 0;
-        if (!_originals.Exists(o => ReferenceEquals(o.target, targetConfig) && o.field == field))
-            _originals.Add((targetConfig, field, fi.GetValue(targetConfig)));
-        try { fi.SetValue(targetConfig, srcLib); return 1; }
-        catch (Exception e) { Plugin.Log.LogWarning($"override anim lib: {e.Message}"); return 0; }
+        if (_activeCharm == null) return null;
+        return part == CharmPart.Slot
+            ? _activeCharm.SlotCrestId
+            : _activeCharm.PartCrestIds.TryGetValue(part.ToString(), out var id) ? id : null;
     }
 
-    private void ActivateRoot(object srcGroup)
+    public bool UsesCrestFor(CharmPart part, string? crestId)
+    {
+        if (string.IsNullOrEmpty(crestId)) return false;
+        return string.Equals(SelectedCrestId(part), crestId, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static void RefreshConfigGroup(object hero, object activeGroup)
     {
         try
         {
-            var go = AccessTools.Field(srcGroup.GetType(), "ActiveRoot")?.GetValue(srcGroup) as GameObject;
-            if (go == null) return;
-            if (_activatedRoots.Contains(go)) return;
-            go.SetActive(true);
-            _activatedRoots.Add(go);
+            // SetConfigGroup also refreshes HeroController's cached slash,
+            // downspike and damager references. Merely changing ConfigGroup
+            // fields leaves those caches pointing at the original crest.
+            var groupType = activeGroup.GetType();
+            var mi = AccessTools.Method(hero.GetType(), "SetConfigGroup",
+                new[] { groupType, groupType });
+            mi?.Invoke(hero, new object?[] { activeGroup, null });
         }
-        catch (Exception e) { Plugin.Log.LogWarning($"activate root: {e.Message}"); }
-    }
-
-    private static void RefreshAnimation(object hero, object? activeConfig)
-    {
-        if (activeConfig == null) return;
-        try
-        {
-            var animCtrl = AccessTools.Field(hero.GetType(), "animCtrl")?.GetValue(hero);
-            if (animCtrl == null) return;
-            var mi = AccessTools.Method(animCtrl.GetType(), "SetHeroControllerConfig", new[] { activeConfig.GetType() });
-            mi?.Invoke(animCtrl, new object?[] { activeConfig });
-        }
-        catch (Exception e) { Plugin.Log.LogWarning($"refresh animation: {e.Message}"); }
+        catch (Exception e) { Plugin.Log.LogWarning($"refresh config group: {e.Message}"); }
     }
 
     private static object? ResolveHero()

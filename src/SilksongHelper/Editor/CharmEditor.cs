@@ -375,7 +375,7 @@ public sealed class CharmEditor : MonoBehaviour
         using (new GUILayout.HorizontalScope("box"))
         {
             GUILayout.Label(CharmPartNames.Display(part), Bold, GUILayout.Width(110));
-            using (var s = new GUILayout.ScrollViewScope(scroll, false, false, GUILayout.Height(110)))
+            using (var s = new GUILayout.ScrollViewScope(scroll, false, false, GUILayout.Height(150)))
             {
                 scroll = s.scrollPosition;
                 var current = get();
@@ -388,10 +388,10 @@ public sealed class CharmEditor : MonoBehaviour
                         GUI.color = sel ? new Color(0.65f, 1f, 0.65f) : Color.white;
                         using (new GUILayout.VerticalScope("box", GUILayout.Width(72)))
                         {
-                            GUILayout.Label(opt.Preview.CurrentFrame, GUILayout.Width(56), GUILayout.Height(56));
-                            GUILayout.Label(opt.CrestName, Small, GUILayout.Width(56));
                             if (GUILayout.Button(sel ? "已选" : "选择", GUILayout.Width(56)))
                                 set(sel ? null : opt.CrestId);
+                            GUILayout.Label(opt.Preview.CurrentFrame, GUILayout.Width(56), GUILayout.Height(56));
+                            GUILayout.Label(opt.CrestName, Small, GUILayout.Width(56));
                         }
                         GUI.color = old;
                     }

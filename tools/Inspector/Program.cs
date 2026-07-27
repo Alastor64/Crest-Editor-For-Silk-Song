@@ -37,6 +37,57 @@ if (mode == "--find")
     return 0;
 }
 
+if (mode == "--calls")
+{
+    var rx = new Regex(args[2]);
+    foreach (var t in EnumerateAll(asm.MainModule))
+    {
+        foreach (var m in t.Methods)
+        {
+            if (!m.HasBody) continue;
+            foreach (var instruction in m.Body.Instructions)
+            {
+                if (instruction.Operand is MethodReference called
+                    && rx.IsMatch(called.FullName))
+                {
+                    Console.WriteLine(
+                        $"{t.FullName}::{m.Name} -> {called.FullName}");
+                }
+                else if (instruction.Operand is FieldReference field
+                    && rx.IsMatch(field.FullName))
+                {
+                    Console.WriteLine(
+                        $"{t.FullName}::{m.Name} -> {field.FullName}");
+                }
+            }
+        }
+    }
+    return 0;
+}
+
+if (mode == "--method")
+{
+    var typeName = args[2];
+    var methodRx = new Regex(args[3]);
+    var t = EnumerateAll(asm.MainModule)
+        .FirstOrDefault(x => x.Name == typeName || x.FullName == typeName);
+    if (t == null) { Console.Error.WriteLine($"type '{typeName}' not found"); return 2; }
+
+    foreach (var m in t.Methods.Where(x => methodRx.IsMatch(x.Name)))
+    {
+        Console.WriteLine(
+            $"// {t.FullName}::{m.Name}({string.Join(", ", m.Parameters.Select(p => Sig(p.ParameterType)))})");
+        if (!m.HasBody)
+        {
+            Console.WriteLine("(no body)");
+            continue;
+        }
+        foreach (var instruction in m.Body.Instructions)
+            Console.WriteLine(instruction);
+    }
+    return 0;
+}
+
 if (mode == "--type")
 {
     var name = args[2];

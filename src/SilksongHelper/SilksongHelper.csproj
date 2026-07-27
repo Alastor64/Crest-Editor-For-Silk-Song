@@ -34,6 +34,10 @@
       <HintPath>$(ManagedDir)/Assembly-CSharp.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="TeamCherry.TK2D">
+      <HintPath>$(ManagedDir)/TeamCherry.TK2D.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="Newtonsoft.Json">
       <HintPath>$(ManagedDir)/Newtonsoft.Json.dll</HintPath>
       <Private>false</Private>

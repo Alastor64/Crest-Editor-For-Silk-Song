@@ -13,26 +13,67 @@ namespace SilksongHelper;
 /// </summary>
 internal static class CrestIdentityPatches
 {
-    [ThreadStatic]
-    private static CharmPart? _identityPart;
-
-    private static void Enter(CharmPart part, out CharmPart? __state)
+    internal enum IdentityScope
     {
-        __state = _identityPart;
-        _identityPart = part;
+        None,
+        HealMethod,
+        BindCompleted,
+        Slot,
+        CombatBehaviours,
     }
 
-    private static Exception? Exit(Exception? __exception, CharmPart? __state)
+    [ThreadStatic]
+    private static IdentityScope _identityScope;
+
+    private static void Enter(IdentityScope scope, out IdentityScope __state)
     {
-        _identityPart = __state;
+        __state = _identityScope;
+        _identityScope = scope;
+    }
+
+    private static Exception? Exit(Exception? __exception, IdentityScope __state)
+    {
+        _identityScope = __state;
         return __exception;
     }
 
     private static bool SelectedMatches(string? crestId)
     {
-        if (_identityPart == null || Plugin.Applier?.ActiveCharm == null)
+        if (_identityScope == IdentityScope.None
+            || Plugin.Applier?.ActiveCharm == null
+            || string.IsNullOrEmpty(crestId))
             return false;
-        return Plugin.Applier.UsesCrestFor(_identityPart.Value, crestId);
+
+        bool Is(string id) => string.Equals(crestId, id, StringComparison.OrdinalIgnoreCase);
+
+        switch (_identityScope)
+        {
+            case IdentityScope.HealMethod:
+                if (Is("Warrior")) return false;
+                return Plugin.Applier.UsesCrestFor(CharmPart.HealMethod, crestId);
+
+            case IdentityScope.BindCompleted:
+                // Never enter Warrior/Reaper's native state while a synthetic
+                // crest ID is equipped. Their later native update paths assume
+                // that the matching full crest/config is active and can crash
+                // Unity. These behaviours are implemented independently.
+                if (Is("Warrior") || Is("Reaper")) return false;
+                return Plugin.Applier.UsesCrestFor(CharmPart.HealMethod, crestId);
+
+            case IdentityScope.Slot:
+                return Plugin.Applier.UsesCrestFor(CharmPart.Slot, crestId);
+
+            case IdentityScope.CombatBehaviours:
+                // Warrior/Reaper combat checks consume the state created after
+                // binding. The remaining identity checks are crest special
+                // skills (Architect, Hunter, Shaman, Wanderer, etc.).
+                if (Is("Warrior") || Is("Reaper"))
+                    return Plugin.Applier.UsesCrestFor(CharmPart.PostHealEffect, crestId);
+                return Plugin.Applier.UsesCrestFor(CharmPart.SpecialSkill, crestId);
+
+            default:
+                return false;
+        }
     }
 
     [HarmonyPatch(typeof(ToolCrest), nameof(ToolCrest.IsEquipped), MethodType.Getter)]
@@ -40,7 +81,7 @@ internal static class CrestIdentityPatches
     {
         internal static void Postfix(ToolCrest __instance, ref bool __result)
         {
-            if (_identityPart == null || Plugin.Applier?.ActiveCharm == null)
+            if (_identityScope == IdentityScope.None || Plugin.Applier?.ActiveCharm == null)
                 return;
             __result = SelectedMatches(__instance.name);
         }
@@ -61,30 +102,30 @@ internal static class CrestIdentityPatches
             if (bindCost != null) yield return bindCost;
         }
 
-        internal static void Prefix(out CharmPart? __state)
-            => Enter(CharmPart.HealMethod, out __state);
+        internal static void Prefix(out IdentityScope __state)
+            => Enter(IdentityScope.HealMethod, out __state);
 
-        internal static Exception? Finalizer(Exception? __exception, CharmPart? __state)
+        internal static Exception? Finalizer(Exception? __exception, IdentityScope __state)
             => Exit(__exception, __state);
     }
 
     [HarmonyPatch(typeof(HeroController), nameof(HeroController.BindCompleted))]
     internal static class PostHealIdentityScope
     {
-        internal static void Prefix(out CharmPart? __state)
-            => Enter(CharmPart.PostHealEffect, out __state);
+        internal static void Prefix(out IdentityScope __state)
+            => Enter(IdentityScope.BindCompleted, out __state);
 
-        internal static Exception? Finalizer(Exception? __exception, CharmPart? __state)
+        internal static Exception? Finalizer(Exception? __exception, IdentityScope __state)
             => Exit(__exception, __state);
     }
 
     [HarmonyPatch(typeof(BindOrbHudFrame), "DoChangeFrame")]
     internal static class HudIdentityScope
     {
-        internal static void Prefix(out CharmPart? __state)
-            => Enter(CharmPart.Slot, out __state);
+        internal static void Prefix(out IdentityScope __state)
+            => Enter(IdentityScope.Slot, out __state);
 
-        internal static Exception? Finalizer(Exception? __exception, CharmPart? __state)
+        internal static Exception? Finalizer(Exception? __exception, IdentityScope __state)
             => Exit(__exception, __state);
     }
 
@@ -116,10 +157,10 @@ internal static class CrestIdentityPatches
                 yield return method;
         }
 
-        internal static void Prefix(out CharmPart? __state)
-            => Enter(CharmPart.SpecialSkill, out __state);
+        internal static void Prefix(out IdentityScope __state)
+            => Enter(IdentityScope.CombatBehaviours, out __state);
 
-        internal static Exception? Finalizer(Exception? __exception, CharmPart? __state)
+        internal static Exception? Finalizer(Exception? __exception, IdentityScope __state)
             => Exit(__exception, __state);
 
         private static IEnumerable<MethodBase> NamedMethods(Type type, string name)
@@ -162,4 +203,5 @@ internal static class CrestIdentityPatches
             __result = Plugin.Applier.UsesCrestFor(CharmPart.SpecialSkill, "Spell");
         }
     }
+
 }

@@ -14,10 +14,20 @@ public sealed class CharmApplier
 
     private string? _activeId;
     private CustomCharm? _activeCharm;
+    private bool _isApplying;
     private readonly List<(object target, string field, object? value)> _originals = new();
     private readonly HashSet<string> _diagnosedCharmIds = new();
 
     public void ApplyOverrides(CustomCharm charm, object hero)
+    {
+        if (_isApplying) return;
+
+        _isApplying = true;
+        try { ApplyOverridesCore(charm, hero); }
+        finally { _isApplying = false; }
+    }
+
+    private void ApplyOverridesCore(CustomCharm charm, object hero)
     {
         // ResetAllCrestState can run more than once while the same crest remains
         // equipped. Always rebuild the composition after vanilla resets it.

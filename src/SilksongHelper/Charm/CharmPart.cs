@@ -101,6 +101,7 @@ internal static class PartGroupFields
         {
             "<NormalSlash>k__BackingField", "<NormalSlashDamager>k__BackingField", "NormalSlashObject",
             "<AlternateSlash>k__BackingField", "<AlternateSlashDamager>k__BackingField", "AlternateSlashObject",
+            "<WallSlash>k__BackingField", "<WallSlashDamager>k__BackingField", "WallSlashObject",
         },
         CharmPart.DownSlashJump => new[]
         {
@@ -116,6 +117,22 @@ internal static class PartGroupFields
             "<UpSlash>k__BackingField", "<UpSlashDamager>k__BackingField", "UpSlashObject",
             "<AltUpSlash>k__BackingField", "<AltUpSlashDamager>k__BackingField", "AltUpSlashObject",
         },
+        _ => Array.Empty<string>(),
+    };
+}
+
+internal static class PartAttackObjectFields
+{
+    public static IReadOnlyList<string> For(CharmPart p) => p switch
+    {
+        CharmPart.NormalAttack => new[]
+        {
+            "NormalSlashObject", "AlternateSlashObject", "WallSlashObject",
+        },
+        CharmPart.DownSlashJump => new[] { "DownSlashObject", "AltDownSlashObject" },
+        CharmPart.ChargedAttack => new[] { "ChargeSlash" },
+        CharmPart.DashAttack => new[] { "DashStab", "DashStabAlt" },
+        CharmPart.UpSlash => new[] { "UpSlashObject", "AltUpSlashObject" },
         _ => Array.Empty<string>(),
     };
 }

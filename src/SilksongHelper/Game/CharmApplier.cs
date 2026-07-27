@@ -16,6 +16,7 @@ public sealed class CharmApplier
     private CustomCharm? _activeCharm;
     private bool _isApplying;
     private readonly List<(object target, string field, object? value)> _originals = new();
+    private readonly Dictionary<GameObject, GameObject> _attackObjectClones = new();
     private readonly HashSet<string> _diagnosedCharmIds = new();
 
     public void ApplyOverrides(CustomCharm charm, object hero)
@@ -64,6 +65,7 @@ public sealed class CharmApplier
             if (srcGroup != null)
             {
                 applied += CopyFields(active, srcGroup, PartGroupFields.For(part));
+                applied += CopyAttackObjects(hero, active, srcGroup, part);
             }
 
             if (activeConfig != null)
@@ -97,6 +99,16 @@ public sealed class CharmApplier
             catch (Exception e) { Plugin.Log.LogWarning($"restore {field}: {e.Message}"); }
         }
         _originals.Clear();
+        foreach (var clone in _attackObjectClones.Values)
+        {
+            try
+            {
+                if (clone != null)
+                    UnityEngine.Object.Destroy(clone);
+            }
+            catch { }
+        }
+        _attackObjectClones.Clear();
         _activeId = null;
         _activeCharm = null;
     }
@@ -114,6 +126,122 @@ public sealed class CharmApplier
             catch (Exception e) { Plugin.Log.LogWarning($"override {fn}: {e.Message}"); }
         }
         return n;
+    }
+
+    private int CopyAttackObjects(object hero, object targetGroup, object sourceGroup, CharmPart part)
+    {
+        if (ReferenceEquals(targetGroup, sourceGroup))
+            return 0;
+
+        var targetRoot = GetMember(targetGroup, "ActiveRoot") as GameObject;
+        var parent = targetRoot != null
+            ? targetRoot.transform
+            : (hero as Component)?.transform;
+        if (parent == null)
+        {
+            Plugin.Log.LogWarning($"part {part}: active attack root not found.");
+            return 0;
+        }
+
+        int copied = 0;
+        foreach (var objectField in PartAttackObjectFields.For(part))
+        {
+            if (GetMember(sourceGroup, objectField) is not GameObject sourceObject
+                || sourceObject == null)
+                continue;
+
+            if (!_attackObjectClones.TryGetValue(sourceObject, out var clone)
+                || clone == null)
+            {
+                // Source attack objects can be nested below an inactive crest
+                // root. Preserve their world transform while moving the clone
+                // below the active crest root.
+                clone = UnityEngine.Object.Instantiate(sourceObject, parent, true);
+                clone.name = $"SilksongHelper_{part}_{sourceObject.name}";
+                clone.SetActive(sourceObject.activeSelf);
+                _attackObjectClones[sourceObject] = clone;
+                Plugin.Log.LogDebug(
+                    $"cloned attack object {sourceObject.name} for {CharmPartNames.Display(part)}.");
+            }
+
+            copied += SetField(targetGroup, objectField, clone);
+            copied += BindAttackComponents(targetGroup, objectField, clone);
+        }
+        return copied;
+    }
+
+    private int BindAttackComponents(object targetGroup, string objectField, GameObject clone)
+    {
+        int copied = 0;
+        switch (objectField)
+        {
+            case "NormalSlashObject":
+                copied += SetField(targetGroup, "<NormalSlash>k__BackingField",
+                    clone.GetComponent<NailSlash>());
+                copied += SetField(targetGroup, "<NormalSlashDamager>k__BackingField",
+                    clone.GetComponent<DamageEnemies>());
+                break;
+            case "AlternateSlashObject":
+                copied += SetField(targetGroup, "<AlternateSlash>k__BackingField",
+                    clone.GetComponent<NailSlash>());
+                copied += SetField(targetGroup, "<AlternateSlashDamager>k__BackingField",
+                    clone.GetComponent<DamageEnemies>());
+                break;
+            case "WallSlashObject":
+                copied += SetField(targetGroup, "<WallSlash>k__BackingField",
+                    clone.GetComponent<NailSlash>());
+                copied += SetField(targetGroup, "<WallSlashDamager>k__BackingField",
+                    clone.GetComponent<DamageEnemies>());
+                break;
+            case "UpSlashObject":
+                copied += SetField(targetGroup, "<UpSlash>k__BackingField",
+                    clone.GetComponent<NailSlash>());
+                copied += SetField(targetGroup, "<UpSlashDamager>k__BackingField",
+                    clone.GetComponent<DamageEnemies>());
+                break;
+            case "AltUpSlashObject":
+                copied += SetField(targetGroup, "<AltUpSlash>k__BackingField",
+                    clone.GetComponent<NailSlash>());
+                copied += SetField(targetGroup, "<AltUpSlashDamager>k__BackingField",
+                    clone.GetComponent<DamageEnemies>());
+                break;
+            case "DownSlashObject":
+                copied += SetField(targetGroup, "<DownSlash>k__BackingField",
+                    clone.GetComponent<NailSlash>());
+                copied += SetField(targetGroup, "<DownSlashDamager>k__BackingField",
+                    clone.GetComponent<DamageEnemies>());
+                copied += SetField(targetGroup, "<Downspike>k__BackingField",
+                    clone.GetComponent<Downspike>());
+                break;
+            case "AltDownSlashObject":
+                copied += SetField(targetGroup, "<AltDownSlash>k__BackingField",
+                    clone.GetComponent<NailSlash>());
+                copied += SetField(targetGroup, "<AltDownSlashDamager>k__BackingField",
+                    clone.GetComponent<DamageEnemies>());
+                copied += SetField(targetGroup, "<AltDownspike>k__BackingField",
+                    clone.GetComponent<Downspike>());
+                break;
+        }
+        return copied;
+    }
+
+    private int SetField(object target, string name, object? value)
+    {
+        var field = AccessTools.Field(target.GetType(), name);
+        if (field == null)
+            return 0;
+        if (!_originals.Exists(o => ReferenceEquals(o.target, target) && o.field == name))
+            _originals.Add((target, name, field.GetValue(target)));
+        try
+        {
+            field.SetValue(target, value);
+            return 1;
+        }
+        catch (Exception e)
+        {
+            Plugin.Log.LogWarning($"override {name}: {e.Message}");
+            return 0;
+        }
     }
 
     public string? SelectedCrestId(CharmPart part)

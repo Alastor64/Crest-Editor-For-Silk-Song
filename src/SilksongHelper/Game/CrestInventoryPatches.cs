@@ -18,6 +18,10 @@ internal static class CrestInventoryPatches
             {
                 if (__result == null) return;
                 CustomCrestRegistry.EnsureBuilt();
+                __result.RemoveAll(crest =>
+                    crest == null
+                    || (CustomCrestRegistry.IsSentinel(crest.name)
+                        && !CustomCrestRegistry.All.Contains(crest)));
                 foreach (var synth in CustomCrestRegistry.All)
                     if (!__result.Contains(synth))
                         __result.Add(synth);
@@ -89,6 +93,46 @@ internal static class CrestInventoryPatches
             if (__result.Slots != null || __instance == null) return;
             var fallback = CustomCrestRegistry.SaveDataFor(__instance.name);
             if (fallback.HasValue) __result = fallback.Value;
+        }
+    }
+
+    [HarmonyPatch(typeof(ToolItemManager), nameof(ToolItemManager.IsToolEquipped), typeof(string))]
+    internal static class IsCustomCrestToolEquippedPatch
+    {
+        internal static void Postfix(string name, ref bool __result)
+        {
+            if (__result) return;
+            var currentCrest = PlayerData.instance?.CurrentCrestID;
+            if (CustomCrestRegistry.IsToolEquipped(currentCrest, name))
+                __result = true;
+        }
+    }
+
+    [HarmonyPatch(
+        typeof(ToolItemManager),
+        nameof(ToolItemManager.IsToolEquipped),
+        typeof(ToolItem),
+        typeof(ToolEquippedReadSource))]
+    internal static class IsCustomCrestToolEquippedObjectPatch
+    {
+        internal static void Postfix(ToolItem tool, ref bool __result)
+        {
+            if (__result || tool == null) return;
+            var currentCrest = PlayerData.instance?.CurrentCrestID;
+            if (CustomCrestRegistry.IsToolEquipped(currentCrest, tool.name))
+                __result = true;
+        }
+    }
+
+    [HarmonyPatch(typeof(ToolItem), nameof(ToolItem.IsEquippedHud), MethodType.Getter)]
+    internal static class IsCustomCrestToolEquippedHudPatch
+    {
+        internal static void Postfix(ToolItem __instance, ref bool __result)
+        {
+            if (__result || __instance == null) return;
+            var currentCrest = PlayerData.instance?.CurrentCrestID;
+            if (CustomCrestRegistry.IsToolEquipped(currentCrest, __instance.name))
+                __result = true;
         }
     }
 

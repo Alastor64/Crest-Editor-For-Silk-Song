@@ -27,11 +27,19 @@ public static class CustomCrestRegistry
     {
         if (!_dirty) return;
         _dirty = false;
+        var liveCrestList = ResolveLiveCrestList();
         foreach (var obj in _byName.Values)
         {
-            try { if (obj != null) UnityEngine.Object.Destroy(obj); } catch { }
+            try
+            {
+                if (obj == null) continue;
+                liveCrestList?.Remove(obj);
+                UnityEngine.Object.Destroy(obj);
+            }
+            catch { }
         }
         _byName.Clear();
+        _fallbackSaveData.Clear();
 
         foreach (var charm in Plugin.SaveData.Charms)
         {
@@ -43,11 +51,29 @@ public static class CustomCrestRegistry
                 clone.name = SentinelFor(charm.Id);
                 EnsureSaveData(clone, crest);
                 _byName[clone.name] = clone;
+                if (liveCrestList != null && !liveCrestList.Contains(clone))
+                    liveCrestList.Add(clone);
             }
             catch (Exception e) { Plugin.Log.LogWarning($"build synthetic crest for '{charm.Name}': {e}"); }
         }
 
         Plugin.Log.LogInfo($"custom crest registry rebuilt: {_byName.Count} crest(s).");
+    }
+
+    private static ToolCrestList? ResolveLiveCrestList()
+    {
+        try
+        {
+            var manager = ToolItemManager.Instance;
+            if (manager == null) return null;
+            return AccessTools.Field(typeof(ToolItemManager), "crestList")?.GetValue(manager)
+                as ToolCrestList;
+        }
+        catch (Exception e)
+        {
+            Plugin.Log.LogWarning($"resolve live crest list: {e.Message}");
+            return null;
+        }
     }
 
     private static ToolCrest? ResolveSlotCrest(string? id)
@@ -70,6 +96,26 @@ public static class CustomCrestRegistry
 
     public static ToolCrestsData.Data? SaveDataFor(string? name)
         => IsSentinel(name) && _fallbackSaveData.TryGetValue(name!, out var data) ? data : null;
+
+    public static bool IsToolEquipped(string? crestName, string? toolName)
+    {
+        if (string.IsNullOrEmpty(toolName)) return false;
+        if (!IsSentinel(crestName)) return false;
+
+        ToolCrestsData.Data? data = null;
+        try
+        {
+            var live = PlayerData.instance?.ToolEquips?.GetData(crestName);
+            if (live?.Slots != null)
+                data = live;
+        }
+        catch { }
+
+        data ??= SaveDataFor(crestName);
+        return data?.Slots != null
+               && data.Value.Slots.Any(slot =>
+                   string.Equals(slot.EquippedTool, toolName, StringComparison.Ordinal));
+    }
 
     public static string? CustomNameFor(ToolCrest? crestData)
     {
@@ -119,6 +165,10 @@ public static class CustomCrestRegistry
         }
 
         _fallbackSaveData[sentinel] = data;
+        Plugin.Log.LogInfo(
+            $"custom crest slots '{sentinel}': "
+            + string.Join(", ", data.Slots.Select((slot, index) =>
+                $"{index}={(string.IsNullOrEmpty(slot.EquippedTool) ? "(empty)" : slot.EquippedTool)}")));
     }
 
     private static List<ToolCrestsData.SlotData> CloneSlots(ToolCrest source)
@@ -134,7 +184,9 @@ public static class CustomCrestRegistry
                 : default;
             result.Add(new ToolCrestsData.SlotData
             {
-                EquippedTool = "",
+                EquippedTool = sourceData.Slots != null && i < sourceData.Slots.Count
+                    ? sourceData.Slots[i].EquippedTool
+                    : "",
                 IsUnlocked = sourceData.Slots == null ? true : sourceSlot.IsUnlocked,
             });
         }

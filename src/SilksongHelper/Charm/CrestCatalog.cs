@@ -15,7 +15,6 @@ public sealed class CrestInfo
     public int SlotCount { get; set; }
     public object? HeroConfig { get; set; }
     public ToolCrest? Crest { get; set; }
-    public SpriteAnimation Preview { get; set; } = new(Array.Empty<Texture2D>());
 }
 
 public sealed class CrestPartOption
@@ -307,7 +306,6 @@ public static class CrestCatalog
         int slotCount = slots?.Length ?? 0;
         var heroConfig = AccessTools.Property(t, "HeroConfig")?.GetValue(crest, null);
         if (heroConfig is UnityEngine.Object ho && ho == null) heroConfig = null;
-        float hue = HueForId(id);
         return new CrestInfo
         {
             Id = id,
@@ -316,7 +314,6 @@ public static class CrestCatalog
             SlotCount = slotCount,
             HeroConfig = heroConfig,
             Crest = crest as ToolCrest,
-            Preview = new SpriteAnimation(ProceduralTextures.Build(CharmPart.Slot, hue)),
         };
     }
 
@@ -411,7 +408,6 @@ public static class CrestCatalog
         var list = new List<CrestInfo>();
         foreach (var (id, name, slots, overrides) in data)
         {
-            float hue = HueForId(id);
             list.Add(new CrestInfo
             {
                 Id = id,
@@ -419,7 +415,6 @@ public static class CrestCatalog
                 Description = "（占位纹章，游戏数据未加载时显示）",
                 SlotCount = slots,
                 HeroConfig = CreateFallbackConfig(cfgType, overrides),
-                Preview = new SpriteAnimation(ProceduralTextures.Build(CharmPart.Slot, hue)),
             });
         }
         return list;

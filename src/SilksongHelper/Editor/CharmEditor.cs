@@ -14,7 +14,7 @@ public sealed class CharmEditor : MonoBehaviour
     private Rect _window = new Rect(40, 40, 880, 640);
     private Vector2 _contentScroll, _slotScroll;
     private readonly Vector2[] _partScroll = new Vector2[CharmPartNames.NonSlotParts.Count];
-    private Vector2 _previewScroll, _savedScroll;
+    private Vector2 _savedScroll;
     private CustomCharm _work = NewCharm();
     private string _nameBuf = "新建纹章";
 
@@ -328,7 +328,6 @@ public sealed class CharmEditor : MonoBehaviour
                     si++;
                 }
 
-                DrawPreview();
                 GUILayout.Space(4);
                 DrawSavedList();
             }
@@ -410,30 +409,6 @@ public sealed class CharmEditor : MonoBehaviour
                             GUILayout.Label(opt.CrestName, Small, GUILayout.Width(56));
                         }
                         GUI.color = old;
-                    }
-                }
-            }
-        }
-    }
-
-    private void DrawPreview()
-    {
-        using (new GUILayout.HorizontalScope("box"))
-        {
-            GUILayout.Label("预览", Bold, GUILayout.Width(110));
-            using (var s = new GUILayout.ScrollViewScope(_previewScroll, GUILayout.Height(80)))
-            {
-                _previewScroll = s.scrollPosition;
-                foreach (var part in CharmPartNames.NonSlotParts)
-                {
-                    if (!_work.PartCrestIds.TryGetValue(part.ToString(), out var cid))
-                        continue;
-                    var crest = CrestCatalog.ById(cid);
-                    if (crest == null) continue;
-                    using (new GUILayout.VerticalScope("box", GUILayout.Width(64)))
-                    {
-                        GUILayout.Label(crest.Preview.CurrentFrame, GUILayout.Width(56), GUILayout.Height(56));
-                        GUILayout.Label(crest.Name, Small, GUILayout.Width(56));
                     }
                 }
             }

@@ -209,7 +209,6 @@ public sealed class CharmWorkshopUI : MonoBehaviour
             BuildPartRow(part, font);
         }
 
-        BuildPreviewRow(font);
         BuildSavedListRow(font);
     }
 
@@ -315,29 +314,9 @@ public sealed class CharmWorkshopUI : MonoBehaviour
         {
             if (crestId == null) _work.PartCrestIds.Remove(part.ToString());
             else _work.PartCrestIds[part.ToString()] = crestId;
-            UpdatePreviewRow();
             UpdateStatusText();
         });
         _partRows[part] = (row.transform.Find("label").GetComponent<Text>(), scroller, options);
-    }
-
-    private void BuildPreviewRow(Font font)
-    {
-        var row = MakeRow("previewRow", _scrollContent!.transform, 80);
-        row.AddComponent<HorizontalLayoutGroup>().spacing = 6;
-        row.AddComponent<Image>().color = new Color(0.12f, 0.12f, 0.15f, 0.9f);
-        row.name = "_previewRow";
-
-        var label = MakeText("label", row.transform, "预览：", font, 22, TextAnchor.MiddleLeft);
-        label.GetComponent<RectTransform>().sizeDelta = new Vector2(80, 40);
-
-        var container = new GameObject("previewContainer", typeof(HorizontalLayoutGroup));
-        container.transform.SetParent(row.transform, false);
-        container.AddComponent<LayoutElement>().flexibleWidth = 1;
-        var hlg = container.GetComponent<HorizontalLayoutGroup>();
-        hlg.spacing = 4;
-        hlg.childControlWidth = true;
-        hlg.childControlHeight = true;
     }
 
     private void BuildSavedListRow(Font font)
@@ -513,47 +492,6 @@ public sealed class CharmWorkshopUI : MonoBehaviour
         txt.color = _work.IsComplete ? new Color(0.4f, 1f, 0.4f) : Color.red;
     }
 
-    private void UpdatePreviewRow()
-    {
-        var previewRow = _scrollContent?.transform.Find("_previewRow");
-        if (previewRow == null) return;
-        var container = previewRow.Find("previewContainer");
-        if (container == null) return;
-
-        for (int i = container.childCount - 1; i >= 0; i--)
-            Destroy(container.GetChild(i).gameObject);
-
-        if (_gameFont == null) return;
-
-        foreach (var part in CharmPartNames.NonSlotParts)
-        {
-            if (!_work.PartCrestIds.TryGetValue(part.ToString(), out var cid)) continue;
-            var crest = CrestCatalog.ById(cid);
-            if (crest == null) continue;
-
-            var card = new GameObject("preview_" + part, typeof(Image), typeof(VerticalLayoutGroup));
-            card.transform.SetParent(container, false);
-            card.AddComponent<LayoutElement>().preferredWidth = 70;
-            card.GetComponent<Image>().color = new Color(0.15f, 0.15f, 0.18f, 1f);
-            var vlg = card.GetComponent<VerticalLayoutGroup>();
-            vlg.padding = new RectOffset(2, 2, 4, 4);
-            vlg.spacing = 1;
-            vlg.childControlWidth = true;
-            vlg.childControlHeight = false;
-            vlg.childForceExpandWidth = true;
-            vlg.childForceExpandHeight = false;
-
-            var rawImgGo = new GameObject("img", typeof(RawImage));
-            rawImgGo.transform.SetParent(card.transform, false);
-            rawImgGo.AddComponent<LayoutElement>().preferredHeight = 48;
-            rawImgGo.GetComponent<RawImage>().texture = crest.Preview.CurrentFrame;
-            rawImgGo.GetComponent<RectTransform>().sizeDelta = new Vector2(48, 48);
-
-            var nm = MakeText("name", card.transform, crest.Name, _gameFont, 12, TextAnchor.MiddleCenter);
-            nm.GetComponent<RectTransform>().sizeDelta = new Vector2(62, 18);
-        }
-    }
-
     private void RefreshSavedList()
     {
         var listGo = _scrollContent?.transform.Find("_savedList");
@@ -628,7 +566,6 @@ public sealed class CharmWorkshopUI : MonoBehaviour
         if (_scrollContent == null) return;
         CrestCatalog.EnsureLoaded();
         UpdateAllCardStates();
-        UpdatePreviewRow();
         UpdateStatusText();
         RefreshSavedList();
     }

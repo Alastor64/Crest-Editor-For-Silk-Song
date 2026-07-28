@@ -64,6 +64,9 @@ public static class CrestCatalog
             var implementations = new List<CrestInfo>();
             foreach (var c in list)
             {
+                if (DeathGodModule.Is(c.Id) && !DeathGodModule.IsSelectableFor(part))
+                    continue;
+
                 if (part != CharmPart.Slot
                     && !PartBehaviour.UsesCrestIdentity(part)
                     && c.HeroConfig == null
@@ -108,8 +111,8 @@ public static class CrestCatalog
 
     private static bool SameImplementation(CharmPart part, CrestInfo first, CrestInfo second)
     {
-        // Death God intentionally remains a visible editor choice even though
-        // its unspecified modules use Wanderer's runtime implementation.
+        // Death God remains a distinct down-slash choice even though its
+        // action/config/object baseline is Wanderer's implementation.
         if (DeathGodModule.Is(first.Id) || DeathGodModule.Is(second.Id))
             return DeathGodModule.Is(first.Id) && DeathGodModule.Is(second.Id);
 

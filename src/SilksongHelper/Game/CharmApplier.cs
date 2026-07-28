@@ -137,8 +137,8 @@ public sealed class CharmApplier
         CharmPart part,
         string sourceCrestId)
     {
-        bool useDeathGodBlade = DeathGodModule.UsesBladeVisual(part, sourceCrestId);
-        if (ReferenceEquals(targetGroup, sourceGroup) && !useDeathGodBlade)
+        bool useDeathGodEffect = DeathGodModule.UsesDoubleDownSlashEffect(part, sourceCrestId);
+        if (ReferenceEquals(targetGroup, sourceGroup) && !useDeathGodEffect)
             return 0;
 
         var targetRoot = GetMember(targetGroup, "ActiveRoot") as GameObject;
@@ -172,8 +172,8 @@ public sealed class CharmApplier
                     $"cloned attack object {sourceObject.name} for {CharmPartNames.Display(part)}.");
             }
 
-            if (useDeathGodBlade)
-                DeathGodModule.DecorateAttackClone(clone, objectField);
+            if (useDeathGodEffect)
+                DeathGodModule.DecorateDownSlashClone(clone);
 
             copied += SetField(targetGroup, objectField, clone);
             copied += BindAttackComponents(targetGroup, objectField, clone);

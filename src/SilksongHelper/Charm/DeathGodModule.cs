@@ -6,26 +6,29 @@ using UnityEngine;
 namespace SilksongHelper;
 
 /// <summary>
-/// Built-in editor source requested by 死神模块.md. The vanilla Wanderer crest
-/// supplies every unspecified module. Normal attacks additionally receive a
-/// long, dark placeholder blade and a modest reach increase.
+/// Built-in editor source requested by 死神模块选项.md. It is intentionally
+/// available only for the down-slash module. The vanilla Wanderer supplies the
+/// action/config/object baseline, while a separate renderer-only placeholder
+/// doubles the visible effect without changing the attack collider.
 /// </summary>
 internal static class DeathGodModule
 {
     public const string Id = "SilksongHelper_DeathGod";
     public const string FallbackCrestId = "Wanderer";
-    public const string DisplayName = "死神模块";
-    public const string Description =
-        "参考 BVN 的一护·虚化，以天锁斩月般的长刃姿态挥舞织针；未说明的能力继承漫游者。";
+    public const string DisplayName = "死神·下劈跳";
+    public const string Description = "动作与漫游者相同，攻击特效使用 2 倍纯色占位表现。";
 
-    private const string BladeObjectName = "SilksongHelper_DeathGodBlade";
-    private static Sprite? _bladeSprite;
+    private const string EffectObjectName = "SilksongHelper_DeathGodDownSlashEffect";
+    private static Sprite? _effectSprite;
 
     public static bool Is(string? crestId)
         => string.Equals(crestId, Id, StringComparison.OrdinalIgnoreCase);
 
     public static string? RuntimeSourceId(string? crestId)
         => Is(crestId) ? FallbackCrestId : crestId;
+
+    public static bool IsSelectableFor(CharmPart part)
+        => part == CharmPart.DownSlashJump;
 
     public static bool MatchesRuntimeIdentity(string? selectedId, string? queriedId)
     {
@@ -62,38 +65,53 @@ internal static class DeathGodModule
     }
 
     public static string Summary(CharmPart part)
-        => part == CharmPart.NormalAttack
-            ? "漫游者基底；黑色长刃占位表现与加长攻击范围"
-            : "继承漫游者对应模块";
+        => part == CharmPart.DownSlashJump
+            ? "漫游者下劈跳动作；攻击特效大小 2 倍"
+            : "";
 
-    public static bool UsesBladeVisual(CharmPart part, string? crestId)
-        => part == CharmPart.NormalAttack && Is(crestId);
+    public static bool UsesDoubleDownSlashEffect(CharmPart part, string? crestId)
+        => part == CharmPart.DownSlashJump && Is(crestId);
 
-    public static void DecorateAttackClone(GameObject clone, string objectField)
+    public static void DecorateDownSlashClone(GameObject clone)
     {
-        if (clone == null || clone.transform.Find(BladeObjectName) != null)
+        if (clone == null || clone.transform.Find(EffectObjectName) != null)
             return;
 
-        var scale = clone.transform.localScale;
-        float reachScale = objectField == "WallSlashObject" ? 1.15f : 1.35f;
-        clone.transform.localScale = new Vector3(
-            scale.x * reachScale,
-            scale.y * 0.9f,
-            scale.z);
+        var sourceRenderers = clone.GetComponentsInChildren<Renderer>(true)
+            .Where(renderer => renderer != null)
+            .ToArray();
+        Bounds bounds;
+        if (sourceRenderers.Length > 0)
+        {
+            bounds = sourceRenderers[0].bounds;
+            for (int i = 1; i < sourceRenderers.Length; i++)
+                bounds.Encapsulate(sourceRenderers[i].bounds);
+        }
+        else
+        {
+            bounds = new Bounds(clone.transform.position, Vector3.one);
+        }
 
-        var blade = new GameObject(BladeObjectName, typeof(SpriteRenderer));
-        blade.layer = clone.layer;
-        blade.transform.SetParent(clone.transform, false);
-        blade.transform.localPosition = new Vector3(0.35f, 0f, -0.02f);
-        blade.transform.localRotation = Quaternion.identity;
-        blade.transform.localScale = new Vector3(1.7f, 0.55f, 1f);
+        var effect = new GameObject(EffectObjectName, typeof(SpriteRenderer));
+        effect.layer = clone.layer;
+        effect.transform.SetParent(clone.transform, false);
+        effect.transform.localPosition = clone.transform.InverseTransformPoint(bounds.center);
+        effect.transform.localRotation = Quaternion.identity;
 
-        var renderer = blade.GetComponent<SpriteRenderer>();
-        renderer.sprite = BladeSprite;
+        var lossyScale = clone.transform.lossyScale;
+        float localWidth = bounds.size.x / Mathf.Max(Mathf.Abs(lossyScale.x), 0.001f);
+        float localHeight = bounds.size.y / Mathf.Max(Mathf.Abs(lossyScale.y), 0.001f);
+        effect.transform.localScale = new Vector3(
+            Mathf.Max(localWidth * 2f, 1f),
+            Mathf.Max(localHeight * 2f, 1f),
+            1f);
+
+        var renderer = effect.GetComponent<SpriteRenderer>();
+        renderer.sprite = EffectSprite;
         renderer.color = Color.white;
 
-        var nearbyRenderer = clone.GetComponentInChildren<SpriteRenderer>(true);
-        if (nearbyRenderer != null && !ReferenceEquals(nearbyRenderer, renderer))
+        var nearbyRenderer = sourceRenderers.FirstOrDefault();
+        if (nearbyRenderer != null)
         {
             renderer.sortingLayerID = nearbyRenderer.sortingLayerID;
             renderer.sortingOrder = nearbyRenderer.sortingOrder + 1;
@@ -104,34 +122,34 @@ internal static class DeathGodModule
         }
     }
 
-    private static Sprite BladeSprite
+    private static Sprite EffectSprite
     {
         get
         {
-            if (_bladeSprite != null)
-                return _bladeSprite;
+            if (_effectSprite != null)
+                return _effectSprite;
 
-            const int width = 32;
-            const int height = 6;
+            const int width = 4;
+            const int height = 4;
             var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
             {
-                name = "SilksongHelper_DeathGodBladeTexture",
+                name = "SilksongHelper_DeathGodDownSlashEffectTexture",
                 filterMode = FilterMode.Point,
                 wrapMode = TextureWrapMode.Clamp,
                 hideFlags = HideFlags.HideAndDontSave,
             };
-            var pixels = Enumerable.Repeat(new Color32(48, 8, 18, 230), width * height).ToArray();
+            var pixels = Enumerable.Repeat(new Color32(92, 12, 32, 150), width * height).ToArray();
             texture.SetPixels32(pixels);
             texture.Apply(false, true);
 
-            _bladeSprite = Sprite.Create(
+            _effectSprite = Sprite.Create(
                 texture,
                 new Rect(0, 0, width, height),
-                new Vector2(0.05f, 0.5f),
-                16f);
-            _bladeSprite.name = "SilksongHelper_DeathGodBladeSprite";
-            _bladeSprite.hideFlags = HideFlags.HideAndDontSave;
-            return _bladeSprite;
+                new Vector2(0.5f, 0.5f),
+                4f);
+            _effectSprite.name = "SilksongHelper_DeathGodDownSlashEffectSprite";
+            _effectSprite.hideFlags = HideFlags.HideAndDontSave;
+            return _effectSprite;
         }
     }
 }

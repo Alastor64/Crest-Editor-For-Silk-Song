@@ -88,6 +88,49 @@ internal static class CrestIdentityPatches
     }
 
     [HarmonyPatch]
+    internal static class ChargedAttackIdentityPatch
+    {
+        internal static MethodBase? TargetMethod()
+        {
+            var actionType = AccessTools.TypeByName(
+                "HutongGames.PlayMaker.Actions.CheckIfCrestEquipped");
+            return actionType == null
+                ? null
+                : AccessTools.PropertyGetter(actionType, "IsTrue");
+        }
+
+        internal static void Postfix(object __instance, ref bool __result)
+        {
+            if (Plugin.Applier?.ActiveCharm == null || !IsCrestAttacksFsm(__instance))
+                return;
+
+            var crestMember = AccessTools.Field(__instance.GetType(), "Crest")?.GetValue(__instance);
+            var value = crestMember == null
+                ? null
+                : AccessTools.Property(crestMember.GetType(), "Value")?.GetValue(crestMember);
+            if (value is ToolCrest crest)
+                __result = Plugin.Applier.UsesCrestFor(CharmPart.ChargedAttack, crest.name);
+        }
+
+        private static bool IsCrestAttacksFsm(object action)
+        {
+            try
+            {
+                var fsm = AccessTools.Property(action.GetType(), "Fsm")?.GetValue(action);
+                if (fsm == null) return false;
+
+                var name = AccessTools.Property(fsm.GetType(), "Name")?.GetValue(fsm) as string
+                           ?? AccessTools.Field(fsm.GetType(), "name")?.GetValue(fsm) as string;
+                return string.Equals(name, "Crest Attacks", StringComparison.Ordinal);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
+
+    [HarmonyPatch]
     internal static class HealIdentityScope
     {
         internal static IEnumerable<MethodBase> TargetMethods()

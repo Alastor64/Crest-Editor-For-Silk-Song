@@ -65,7 +65,8 @@ public static class CrestCatalog
             {
                 if (part != CharmPart.Slot
                     && !PartBehaviour.UsesCrestIdentity(part)
-                    && c.HeroConfig == null)
+                    && c.HeroConfig == null
+                    && !UsesDefaultHeroConfig(c.Id))
                     continue;
                 opts.Add(BuildOption(c, part));
             }
@@ -159,6 +160,7 @@ public static class CrestCatalog
         string id = (string?)AccessTools.Property(t, "name")?.GetValue(crest, null) ?? "";
         if (string.IsNullOrEmpty(id)) id = (string?)AccessTools.Field(t, "nameCache")?.GetValue(crest) ?? "";
         string? name = ResolveLocalised(AccessTools.Property(t, "DisplayName")?.GetValue(crest, null));
+        name = CorrectKnownDisplayName(id, name);
         if (string.IsNullOrEmpty(name)) name = id;
         string? desc = ResolveLocalised(AccessTools.Property(t, "Description")?.GetValue(crest, null));
         var slots = AccessTools.Property(t, "Slots")?.GetValue(crest, null) as Array;
@@ -176,6 +178,28 @@ public static class CrestCatalog
             Crest = crest as ToolCrest,
             Preview = new SpriteAnimation(ProceduralTextures.Build(CharmPart.Slot, hue)),
         };
+    }
+
+    internal static bool UsesDefaultHeroConfig(string? id)
+        => id != null
+           && (id.Equals("Hunter", StringComparison.OrdinalIgnoreCase)
+               || id.StartsWith("Hunter_", StringComparison.OrdinalIgnoreCase));
+
+    private static string? CorrectKnownDisplayName(string id, string? resolved)
+    {
+        // These two internal crests intentionally use incomplete localisation
+        // keys in the current game data. Do not expose the localisation
+        // system's !!/...!! missing-key markers in the Chinese editor.
+        if (id.Equals("Cursed", StringComparison.OrdinalIgnoreCase)
+            || id.Equals("Curse", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(resolved, "!!/Tools/CREST_CURSE_NAME!!", StringComparison.Ordinal))
+            return "诅咒";
+
+        if (id.Equals("Cloakless", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(resolved, "!!/!!", StringComparison.Ordinal))
+            return "无装";
+
+        return resolved;
     }
 
     private static string? ResolveLocalised(object? ls)

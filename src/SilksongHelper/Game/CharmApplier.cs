@@ -55,6 +55,8 @@ public sealed class CharmApplier
             if (!charm.PartCrestIds.TryGetValue(part.ToString(), out var crestId))
                 continue;
             var srcCfg = ResolveHeroConfig(crestId);
+            if (srcCfg == null && CrestCatalog.UsesDefaultHeroConfig(crestId))
+                srcCfg = groups.Count > 0 ? GetMember(groups[0], "Config") : null;
             if (srcCfg == null)
             {
                 Plugin.Log.LogWarning($"part {part}: source '{crestId}' HeroConfig not found.");

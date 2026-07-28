@@ -39,12 +39,7 @@ internal static class CrestInventoryPatches
             {
                 if (__result != null) return;
                 if (__args == null || __args.Length == 0) return;
-                var name = __args[0] as string;
-                if (!CustomCrestRegistry.IsSentinel(name)) return;
-                // ResetAllCrestState can ask for the equipped crest before the
-                // inventory has ever called GetAllCrests in this process.
-                CustomCrestRegistry.EnsureBuilt();
-                __result = CustomCrestRegistry.Get(name);
+                __result ??= CustomCrestRegistry.Get(__args[0] as string);
             }
             catch (Exception e) { Plugin.Log.LogWarning($"GetCrestByName postfix: {e.Message}"); }
         }
@@ -167,18 +162,12 @@ internal static class CrestInventoryPatches
                 var customId = CustomCrestRegistry.IdFromSentinel(id);
                 if (customId != null)
                 {
-                    var charm = Plugin.SaveData.Charms.FirstOrDefault(c => c.Id == customId)
-                                ?? (Plugin.Applier.ActiveCharmId == customId
-                                    ? Plugin.Applier.ActiveCharm
-                                    : null);
+                    var charm = Plugin.SaveData.Charms.FirstOrDefault(c => c.Id == customId);
                     if (charm != null) Plugin.Applier.ApplyOverrides(charm, __instance);
                 }
                 else
                 {
-                    bool hadCustomSnapshot = Plugin.Applier.ActiveCharm != null;
-                    Plugin.Applier.RestoreOverrides(__instance);
-                    if (hadCustomSnapshot)
-                        CustomCrestRegistry.MarkDirty();
+                    Plugin.Applier.RestoreOverrides();
                 }
             }
             catch (Exception e) { Plugin.Log.LogWarning($"ResetAllCrestState postfix: {e.Message}"); }
@@ -236,13 +225,6 @@ internal static class CrestInventoryPatches
 
                 var hero = HeroController.instance;
                 if (hero == null) return;
-
-                // SetEquippedCrest is the explicit bench/inventory boundary:
-                // this is where a definition saved since the previous equip is
-                // allowed to replace the active snapshot.
-                Plugin.Applier.UseLatestDefinitionOnNextApply();
-                CustomCrestRegistry.MarkDirty();
-                CustomCrestRegistry.EnsureBuilt();
 
                 // The inventory refresh is not guaranteed to call the same
                 // ResetAllCrestState overload on every game version. Invoke the

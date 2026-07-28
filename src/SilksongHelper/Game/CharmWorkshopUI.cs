@@ -257,7 +257,7 @@ public sealed class CharmWorkshopUI : MonoBehaviour
         statusTxt.name = "_statusText";
         statusTxt.color = Color.red;
         var statusLayout = statusTxt.gameObject.AddComponent<LayoutElement>();
-        statusLayout.preferredWidth = 260;
+        statusLayout.preferredWidth = 160;
         statusLayout.preferredHeight = 40;
 
         var spacer = new GameObject("spacer", typeof(RectTransform));
@@ -274,7 +274,8 @@ public sealed class CharmWorkshopUI : MonoBehaviour
             Plugin.SaveData.Upsert(_work);
             Plugin.SaveData.Save();
             CustomCrestRegistry.MarkDirty();
-            _statusText = "已保存；重新装备后生效";
+            Plugin.Applier.ReapplyNow(_work);
+            _statusText = "已保存";
             UpdateStatusText();
         });
 

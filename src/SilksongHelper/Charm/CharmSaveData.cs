@@ -15,13 +15,9 @@ public sealed class CharmSaveData
 
     public void Upsert(CustomCharm charm)
     {
-        // The editor keeps mutating its working copy after Save is pressed.
-        // Persist a snapshot so unsaved edits cannot leak into the definition
-        // that the inventory will equip later.
-        var snapshot = charm.Clone();
         int i = Charms.FindIndex(c => c.Id == charm.Id);
-        if (i >= 0) Charms[i] = snapshot;
-        else Charms.Add(snapshot);
+        if (i >= 0) Charms[i] = charm;
+        else Charms.Add(charm);
     }
 
     public void Delete(string id) => Charms.RemoveAll(c => c.Id == id);

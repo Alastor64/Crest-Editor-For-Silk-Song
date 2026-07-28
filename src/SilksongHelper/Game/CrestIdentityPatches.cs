@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Reflection.Emit;
 using HarmonyLib;
 
 namespace SilksongHelper;
@@ -54,12 +53,11 @@ internal static class CrestIdentityPatches
                 return Plugin.Applier.UsesCrestFor(CharmPart.HealMethod, crestId);
 
             case IdentityScope.BindCompleted:
-                // Warrior's state also owns attack-healing and a special
-                // ConfigGroup, so it remains isolated. Reaper's state only
-                // owns the post-bind timer/effect and is safe to reuse.
-                if (Is("Warrior")) return false;
-                if (Is("Reaper"))
-                    return Plugin.Applier.UsesCrestFor(CharmPart.PostHealEffect, crestId);
+                // Never enter Warrior/Reaper's native state while a synthetic
+                // crest ID is equipped. Their later native update paths assume
+                // that the matching full crest/config is active and can crash
+                // Unity. These behaviours are implemented independently.
+                if (Is("Warrior") || Is("Reaper")) return false;
                 return Plugin.Applier.UsesCrestFor(CharmPart.HealMethod, crestId);
 
             case IdentityScope.Slot:
@@ -76,23 +74,6 @@ internal static class CrestIdentityPatches
             default:
                 return false;
         }
-    }
-
-    private static string EffectiveDownSlashCrestId(PlayerData playerData)
-    {
-        if (Plugin.Applier?.ActiveCharm == null)
-            return playerData.CurrentCrestID;
-
-        var selected = Plugin.Applier.SelectedCrestId(CharmPart.DownSlashJump);
-        return DeathGodModule.RuntimeSourceId(selected) ?? playerData.CurrentCrestID;
-    }
-
-    private static string EffectiveHealthDamageCrestId(PlayerData playerData)
-    {
-        if (Plugin.Applier?.ActiveCharm != null
-            && Plugin.Applier.UsesCrestFor(CharmPart.PostHealEffect, "Reaper"))
-            return "Reaper";
-        return playerData.CurrentCrestID;
     }
 
     [HarmonyPatch(typeof(ToolCrest), nameof(ToolCrest.IsEquipped), MethodType.Getter)]
@@ -145,72 +126,6 @@ internal static class CrestIdentityPatches
             catch
             {
                 return false;
-            }
-        }
-    }
-
-    [HarmonyPatch]
-    internal static class BouncePullCrestIdentityPatch
-    {
-        internal static MethodBase? TargetMethod()
-        {
-            var stateMachine = AccessTools.Inner(typeof(BounceShared), "<BouncePull>d__8");
-            return stateMachine == null ? null : AccessTools.Method(stateMachine, "MoveNext");
-        }
-
-        internal static IEnumerable<CodeInstruction> Transpiler(
-            IEnumerable<CodeInstruction> instructions)
-        {
-            var currentCrestId = AccessTools.Field(typeof(PlayerData), "CurrentCrestID");
-            var effectiveId = AccessTools.Method(
-                typeof(CrestIdentityPatches), nameof(EffectiveDownSlashCrestId));
-
-            foreach (var instruction in instructions)
-            {
-                if (currentCrestId != null
-                    && effectiveId != null
-                    && instruction.opcode == OpCodes.Ldfld
-                    && Equals(instruction.operand, currentCrestId))
-                {
-                    var replacement = new CodeInstruction(OpCodes.Call, effectiveId);
-                    replacement.labels.AddRange(instruction.labels);
-                    replacement.blocks.AddRange(instruction.blocks);
-                    yield return replacement;
-                }
-                else
-                {
-                    yield return instruction;
-                }
-            }
-        }
-    }
-
-    [HarmonyPatch(typeof(HealthManager), "TakeDamage")]
-    internal static class ReaperDamageCrestIdentityPatch
-    {
-        internal static IEnumerable<CodeInstruction> Transpiler(
-            IEnumerable<CodeInstruction> instructions)
-        {
-            var currentCrestId = AccessTools.Field(typeof(PlayerData), "CurrentCrestID");
-            var effectiveId = AccessTools.Method(
-                typeof(CrestIdentityPatches), nameof(EffectiveHealthDamageCrestId));
-
-            foreach (var instruction in instructions)
-            {
-                if (currentCrestId != null
-                    && effectiveId != null
-                    && instruction.opcode == OpCodes.Ldfld
-                    && Equals(instruction.operand, currentCrestId))
-                {
-                    var replacement = new CodeInstruction(OpCodes.Call, effectiveId);
-                    replacement.labels.AddRange(instruction.labels);
-                    replacement.blocks.AddRange(instruction.blocks);
-                    yield return replacement;
-                }
-                else
-                {
-                    yield return instruction;
-                }
             }
         }
     }

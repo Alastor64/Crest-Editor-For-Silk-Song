@@ -14,7 +14,7 @@ public sealed class Plugin : BaseUnityPlugin
 {
     public const string PluginGuid = "com.silksong.helper";
     public const string PluginName = "Silksong Helper";
-    public const string PluginVersion = "0.4.2";
+    public const string PluginVersion = "0.4.1";
 
     internal static ManualLogSource Log = null!;
     internal static CharmApplier Applier = null!;
@@ -43,7 +43,7 @@ public sealed class Plugin : BaseUnityPlugin
 
     private void OnDestroy()
     {
-        Applier?.RestoreOverrides(HeroController.instance);
+        Applier?.RestoreOverrides();
         _harmony?.UnpatchSelf();
     }
 

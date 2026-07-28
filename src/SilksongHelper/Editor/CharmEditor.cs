@@ -17,6 +17,7 @@ public sealed class CharmEditor : MonoBehaviour
     private Vector2 _savedScroll;
     private CustomCharm _work = NewCharm();
     private string _nameBuf = "新建纹章";
+    private string _descriptionBuf = "";
 
     private const float Edge = 8f;
     private const float TitleH = 28f;
@@ -362,24 +363,37 @@ public sealed class CharmEditor : MonoBehaviour
 
     private void DrawTopBar()
     {
-        using (new GUILayout.HorizontalScope("box"))
+        using (new GUILayout.VerticalScope("box"))
         {
-            GUILayout.Label("名称", Bold, GUILayout.Width(48));
-            _nameBuf = GUILayout.TextField(_nameBuf, 24, GUILayout.Width(160));
-            GUILayout.Label(_work.IsComplete ? "组合完整" : "组合未完成", _work.IsComplete ? Bold : Red, GUILayout.Width(96));
-            GUILayout.FlexibleSpace();
-            if (GUILayout.Button("新建", GUILayout.Width(60)))
+            using (new GUILayout.HorizontalScope())
             {
-                _work = NewCharm();
-                _nameBuf = _work.Name;
+                GUILayout.Label("名称", Bold, GUILayout.Width(48));
+                _nameBuf = GUILayout.TextField(_nameBuf, 24, GUILayout.Width(200));
+                GUILayout.Label(_work.IsComplete ? "组合完整" : "组合未完成",
+                    _work.IsComplete ? Bold : Red, GUILayout.Width(96));
+                GUILayout.FlexibleSpace();
+                if (GUILayout.Button("新建", GUILayout.Width(60)))
+                {
+                    _work = NewCharm();
+                    _nameBuf = _work.Name;
+                    _descriptionBuf = _work.Description;
+                }
+                if (GUILayout.Button("保存", GUILayout.Width(60)))
+                {
+                    _work.Name = _nameBuf;
+                    _work.Description = _descriptionBuf;
+                    Plugin.SaveData.Upsert(_work);
+                    Plugin.SaveData.Save();
+                    CustomCrestRegistry.MarkDirty();
+                    Plugin.Applier.ReapplyNow(_work);
+                }
             }
-            if (GUILayout.Button("保存", GUILayout.Width(60)))
+
+            using (new GUILayout.HorizontalScope())
             {
-                _work.Name = _nameBuf;
-                Plugin.SaveData.Upsert(_work);
-                Plugin.SaveData.Save();
-                CustomCrestRegistry.MarkDirty();
-                Plugin.Applier.ReapplyNow(_work);
+                GUILayout.Label("描述", Bold, GUILayout.Width(48));
+                _descriptionBuf = GUILayout.TextArea(
+                    _descriptionBuf, 180, GUILayout.MinHeight(48), GUILayout.ExpandWidth(true));
             }
         }
     }
@@ -440,6 +454,7 @@ public sealed class CharmEditor : MonoBehaviour
                     {
                         _work = c.Clone();
                         _nameBuf = _work.Name;
+                        _descriptionBuf = _work.Description;
                     }
                     if (GUILayout.Button("删除", GUILayout.Width(60)))
                     {

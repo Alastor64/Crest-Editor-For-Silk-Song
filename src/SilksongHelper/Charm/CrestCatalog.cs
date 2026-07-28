@@ -54,8 +54,10 @@ public static class CrestCatalog
         var list = TryReadLiveCrests();
         if (list.Count == 0)
             list = BuildFallbackCrests();
+        DeathGodModule.AddCatalogEntry(list);
         _crests = list;
-        _byId = list.Where(c => !string.IsNullOrEmpty(c.Id)).ToDictionary(c => c.Id);
+        _byId = list.Where(c => !string.IsNullOrEmpty(c.Id))
+            .ToDictionary(c => c.Id, StringComparer.OrdinalIgnoreCase);
         _options = new Dictionary<CharmPart, List<CrestPartOption>>();
         foreach (var part in CharmPartNames.All)
         {
@@ -106,6 +108,11 @@ public static class CrestCatalog
 
     private static bool SameImplementation(CharmPart part, CrestInfo first, CrestInfo second)
     {
+        // Death God intentionally remains a visible editor choice even though
+        // its unspecified modules use Wanderer's runtime implementation.
+        if (DeathGodModule.Is(first.Id) || DeathGodModule.Is(second.Id))
+            return DeathGodModule.Is(first.Id) && DeathGodModule.Is(second.Id);
+
         if (part == CharmPart.Slot)
             return string.Equals(first.Id, second.Id, StringComparison.OrdinalIgnoreCase);
 
@@ -206,11 +213,13 @@ public static class CrestCatalog
 
     private static CrestPartOption BuildOption(CrestInfo crest, CharmPart part)
     {
-        float hue = HueForId(crest.Id);
+        float hue = DeathGodModule.Is(crest.Id) ? 0.98f : HueForId(crest.Id);
         var preview = new SpriteAnimation(ProceduralTextures.Build(part, hue));
-        string summary = part == CharmPart.Slot
-            ? $"{crest.SlotCount} 个槽位"
-            : Summarize(crest.HeroConfig, part);
+        string summary = DeathGodModule.Is(crest.Id)
+            ? DeathGodModule.Summary(part)
+            : part == CharmPart.Slot
+                ? $"{crest.SlotCount} 个槽位"
+                : Summarize(crest.HeroConfig, part);
         return new CrestPartOption
         {
             CrestId = crest.Id,

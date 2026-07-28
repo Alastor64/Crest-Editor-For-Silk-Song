@@ -19,7 +19,10 @@ public sealed class CharmWorkshopUI : MonoBehaviour
 
     private CustomCharm _work = new() { Name = "新建纹章" };
     private string _nameText = "新建纹章";
+    private string _descriptionText = "";
     private string? _statusText;
+    private InputField? _nameInput;
+    private InputField? _descriptionInput;
 
     private Dictionary<CharmPart, (Text label, ScrollRect scroller, List<(Button btn, string crestId)> options)> _partRows = new();
 
@@ -214,17 +217,124 @@ public sealed class CharmWorkshopUI : MonoBehaviour
 
     private void BuildNameBar(Font font)
     {
-        var bar = MakeRow("nameBar", _scrollContent!.transform, 80);
-        bar.AddComponent<HorizontalLayoutGroup>().spacing = 12;
+        var bar = MakeRow("nameBar", _scrollContent!.transform, 150);
+        var barLayout = bar.AddComponent<VerticalLayoutGroup>();
+        barLayout.padding = new RectOffset(10, 10, 8, 8);
+        barLayout.spacing = 6;
+        barLayout.childControlWidth = true;
+        barLayout.childControlHeight = true;
+        barLayout.childForceExpandWidth = true;
+        barLayout.childForceExpandHeight = false;
         bar.AddComponent<Image>().color = new Color(0.12f, 0.12f, 0.15f, 0.9f);
 
-        var nameLabel = MakeText("label", bar.transform, "名称：", font, 22, TextAnchor.MiddleLeft);
-        nameLabel.GetComponent<RectTransform>().sizeDelta = new Vector2(80, 40);
+        var nameRow = MakeRow("nameRow", bar.transform, 52);
+        var nameLayout = nameRow.AddComponent<HorizontalLayoutGroup>();
+        nameLayout.spacing = 12;
+        nameLayout.childControlWidth = true;
+        nameLayout.childControlHeight = true;
+        nameLayout.childForceExpandWidth = false;
+        nameLayout.childForceExpandHeight = true;
 
-        var inputFieldGo = new GameObject("NameInput", typeof(InputField), typeof(Image));
-        inputFieldGo.transform.SetParent(bar.transform, false);
-        inputFieldGo.GetComponent<RectTransform>().sizeDelta = new Vector2(240, 44);
+        var nameLabel = MakeText("label", nameRow.transform, "名称：", font, 22, TextAnchor.MiddleLeft);
+        var nameLabelLayout = nameLabel.gameObject.AddComponent<LayoutElement>();
+        nameLabelLayout.preferredWidth = 80;
+        nameLabelLayout.preferredHeight = 40;
+
+        _nameInput = MakeInputField(
+            "NameInput", nameRow.transform, font, 22, "输入纹章名称...", false);
+        var nameInputLayout = _nameInput.gameObject.AddComponent<LayoutElement>();
+        nameInputLayout.preferredWidth = 280;
+        nameInputLayout.preferredHeight = 44;
+        _nameInput.characterLimit = 24;
+        _nameInput.text = _nameText;
+        _nameInput.onValueChanged.AddListener(v =>
+        {
+            _nameText = v ?? "新建纹章";
+            _work.Name = _nameText;
+        });
+
+        var statusTxt = MakeText("status", nameRow.transform, "组合未完成", font, 20, TextAnchor.MiddleLeft);
+        statusTxt.name = "_statusText";
+        statusTxt.color = Color.red;
+        var statusLayout = statusTxt.gameObject.AddComponent<LayoutElement>();
+        statusLayout.preferredWidth = 160;
+        statusLayout.preferredHeight = 40;
+
+        var spacer = new GameObject("spacer", typeof(RectTransform));
+        spacer.transform.SetParent(nameRow.transform, false);
+        spacer.AddComponent<LayoutElement>().flexibleWidth = 1;
+
+        var saveBtn = MakeButton("saveBtn", nameRow.transform, "保存", font, 20);
+        var saveLayout = saveBtn.gameObject.AddComponent<LayoutElement>();
+        saveLayout.preferredWidth = 80;
+        saveLayout.preferredHeight = 40;
+        saveBtn.onClick.AddListener(() =>
+        {
+            PullEditorText();
+            Plugin.SaveData.Upsert(_work);
+            Plugin.SaveData.Save();
+            CustomCrestRegistry.MarkDirty();
+            Plugin.Applier.ReapplyNow(_work);
+            _statusText = "已保存";
+            UpdateStatusText();
+        });
+
+        var newBtn = MakeButton("newBtn", nameRow.transform, "新建", font, 20);
+        var newLayout = newBtn.gameObject.AddComponent<LayoutElement>();
+        newLayout.preferredWidth = 80;
+        newLayout.preferredHeight = 40;
+        newBtn.onClick.AddListener(() =>
+        {
+            _work = new CustomCharm { Name = "新建纹章" };
+            _nameText = _work.Name;
+            _descriptionText = _work.Description;
+            _statusText = null;
+            RefreshAll();
+        });
+
+        var descriptionRow = MakeRow("descriptionRow", bar.transform, 72);
+        var descriptionLayout = descriptionRow.AddComponent<HorizontalLayoutGroup>();
+        descriptionLayout.spacing = 12;
+        descriptionLayout.childControlWidth = true;
+        descriptionLayout.childControlHeight = true;
+        descriptionLayout.childForceExpandWidth = false;
+        descriptionLayout.childForceExpandHeight = true;
+
+        var descriptionLabel = MakeText(
+            "label", descriptionRow.transform, "描述：", font, 22, TextAnchor.UpperLeft);
+        var descriptionLabelLayout = descriptionLabel.gameObject.AddComponent<LayoutElement>();
+        descriptionLabelLayout.preferredWidth = 80;
+        descriptionLabelLayout.preferredHeight = 64;
+
+        _descriptionInput = MakeInputField(
+            "DescriptionInput", descriptionRow.transform, font, 19, "输入纹章描述...", true);
+        _descriptionInput.characterLimit = 180;
+        _descriptionInput.text = _descriptionText;
+        var descriptionLayoutElement = _descriptionInput.gameObject.AddComponent<LayoutElement>();
+        descriptionLayoutElement.flexibleWidth = 1;
+        descriptionLayoutElement.preferredHeight = 64;
+        _descriptionInput.onValueChanged.AddListener(v =>
+        {
+            _descriptionText = v ?? "";
+            _work.Description = _descriptionText;
+        });
+    }
+
+    private static InputField MakeInputField(
+        string name,
+        Transform parent,
+        Font font,
+        int fontSize,
+        string placeholderText,
+        bool multiline)
+    {
+        var inputFieldGo = new GameObject(name, typeof(InputField), typeof(Image));
+        inputFieldGo.transform.SetParent(parent, false);
         var inputField = inputFieldGo.GetComponent<InputField>();
+        inputField.lineType = multiline
+            ? InputField.LineType.MultiLineNewline
+            : InputField.LineType.SingleLine;
+
         var textGo = new GameObject("Text", typeof(Text));
         textGo.transform.SetParent(inputFieldGo.transform, false);
         var textRt = textGo.GetComponent<RectTransform>();
@@ -234,10 +344,11 @@ public sealed class CharmWorkshopUI : MonoBehaviour
         textRt.offsetMax = new Vector2(-8, -4);
         var textComp = textGo.GetComponent<Text>();
         textComp.font = font;
-        textComp.fontSize = 22;
+        textComp.fontSize = fontSize;
         textComp.color = Color.white;
-        textComp.alignment = TextAnchor.MiddleLeft;
+        textComp.alignment = multiline ? TextAnchor.UpperLeft : TextAnchor.MiddleLeft;
         textComp.supportRichText = false;
+
         var placeholder = new GameObject("Placeholder", typeof(Text));
         placeholder.transform.SetParent(inputFieldGo.transform, false);
         var phRt = placeholder.GetComponent<RectTransform>();
@@ -247,51 +358,24 @@ public sealed class CharmWorkshopUI : MonoBehaviour
         phRt.offsetMax = new Vector2(-8, -4);
         var phText = placeholder.GetComponent<Text>();
         phText.font = font;
-        phText.fontSize = 22;
+        phText.fontSize = fontSize;
         phText.color = new Color(0.5f, 0.5f, 0.5f);
-        phText.alignment = TextAnchor.MiddleLeft;
-        phText.text = "输入纹章名称...";
+        phText.alignment = multiline ? TextAnchor.UpperLeft : TextAnchor.MiddleLeft;
+        phText.text = placeholderText;
         phText.fontStyle = FontStyle.Italic;
+
         inputField.textComponent = textComp;
         inputField.placeholder = phText;
         inputField.image.color = new Color(0.2f, 0.2f, 0.25f);
-        inputField.onEndEdit.AddListener(v =>
-        {
-            _nameText = v ?? "新建纹章";
-            _work.Name = _nameText;
-        });
+        return inputField;
+    }
 
-        var statusTxt = MakeText("status", bar.transform, "组合未完成", font, 20, TextAnchor.MiddleLeft);
-        statusTxt.name = "_statusText";
-        statusTxt.color = Color.red;
-        statusTxt.GetComponent<RectTransform>().sizeDelta = new Vector2(160, 40);
-
-        var spacer = new GameObject("spacer", typeof(RectTransform));
-        spacer.transform.SetParent(bar.transform, false);
-        spacer.AddComponent<LayoutElement>().flexibleWidth = 1;
-
-        var saveBtn = MakeButton("saveBtn", bar.transform, "保存", font, 20);
-        saveBtn.GetComponent<RectTransform>().sizeDelta = new Vector2(80, 40);
-        saveBtn.onClick.AddListener(() =>
-        {
-            _work.Name = _nameText;
-            Plugin.SaveData.Upsert(_work);
-            Plugin.SaveData.Save();
-            CustomCrestRegistry.MarkDirty();
-            Plugin.Applier.ReapplyNow(_work);
-            _statusText = "已保存";
-            UpdateStatusText();
-        });
-
-        var newBtn = MakeButton("newBtn", bar.transform, "新建", font, 20);
-        newBtn.GetComponent<RectTransform>().sizeDelta = new Vector2(80, 40);
-        newBtn.onClick.AddListener(() =>
-        {
-            _work = new CustomCharm { Name = "新建纹章" };
-            _nameText = _work.Name;
-            _statusText = null;
-            RefreshAll();
-        });
+    private void PullEditorText()
+    {
+        _nameText = _nameInput?.text ?? _nameText;
+        _descriptionText = _descriptionInput?.text ?? _descriptionText;
+        _work.Name = string.IsNullOrWhiteSpace(_nameText) ? "新建纹章" : _nameText;
+        _work.Description = _descriptionText ?? "";
     }
 
     private void BuildSlotRow(Font font)
@@ -481,7 +565,7 @@ public sealed class CharmWorkshopUI : MonoBehaviour
 
     private void UpdateStatusText()
     {
-        var statusGo = _scrollContent?.transform.Find("nameBar/_statusText");
+        var statusGo = _scrollContent?.transform.Find("nameBar/nameRow/_statusText");
         var txt = statusGo?.GetComponent<Text>();
         if (txt == null) return;
 
@@ -546,6 +630,7 @@ public sealed class CharmWorkshopUI : MonoBehaviour
             {
                 _work = charm.Clone();
                 _nameText = _work.Name;
+                _descriptionText = _work.Description;
                 RefreshAll();
             });
 
@@ -565,6 +650,12 @@ public sealed class CharmWorkshopUI : MonoBehaviour
     {
         if (_scrollContent == null) return;
         CrestCatalog.EnsureLoaded();
+        _nameText = _work.Name ?? "新建纹章";
+        _descriptionText = _work.Description ?? "";
+        if (_nameInput != null && _nameInput.text != _nameText)
+            _nameInput.text = _nameText;
+        if (_descriptionInput != null && _descriptionInput.text != _descriptionText)
+            _descriptionInput.text = _descriptionText;
         UpdateAllCardStates();
         UpdateStatusText();
         RefreshSavedList();

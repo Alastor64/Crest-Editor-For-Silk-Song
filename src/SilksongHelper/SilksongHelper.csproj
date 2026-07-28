@@ -8,7 +8,7 @@
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <AssemblyTitle>Silksong Helper - Custom Charm Editor</AssemblyTitle>
-    <Version>0.1.0</Version>
+    <Version>0.4.0</Version>
     <Copyright>MIT</Copyright>
     <DebugType>portable</DebugType>
     <DebugSymbols>true</DebugSymbols>

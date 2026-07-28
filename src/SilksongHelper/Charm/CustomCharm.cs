@@ -8,6 +8,7 @@ public sealed class CustomCharm
 {
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string Name { get; set; } = "新建纹章";
+    public string Description { get; set; } = "";
 
     public string? SlotCrestId { get; set; }
 
@@ -27,6 +28,7 @@ public sealed class CustomCharm
         {
             Id = Id,
             Name = Name,
+            Description = Description,
             SlotCrestId = SlotCrestId,
             PartCrestIds = new Dictionary<string, string>(PartCrestIds),
         };

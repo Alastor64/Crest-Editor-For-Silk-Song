@@ -67,7 +67,7 @@ public sealed class CharmApplier
             if (srcGroup != null)
             {
                 applied += CopyFields(active, srcGroup, PartGroupFields.For(part));
-                applied += CopyAttackObjects(hero, active, srcGroup, part);
+                applied += CopyAttackObjects(hero, active, srcGroup, part, crestId);
             }
 
             if (activeConfig != null)
@@ -130,9 +130,15 @@ public sealed class CharmApplier
         return n;
     }
 
-    private int CopyAttackObjects(object hero, object targetGroup, object sourceGroup, CharmPart part)
+    private int CopyAttackObjects(
+        object hero,
+        object targetGroup,
+        object sourceGroup,
+        CharmPart part,
+        string sourceCrestId)
     {
-        if (ReferenceEquals(targetGroup, sourceGroup))
+        bool useDeathGodBlade = DeathGodModule.UsesBladeVisual(part, sourceCrestId);
+        if (ReferenceEquals(targetGroup, sourceGroup) && !useDeathGodBlade)
             return 0;
 
         var targetRoot = GetMember(targetGroup, "ActiveRoot") as GameObject;
@@ -165,6 +171,9 @@ public sealed class CharmApplier
                 Plugin.Log.LogDebug(
                     $"cloned attack object {sourceObject.name} for {CharmPartNames.Display(part)}.");
             }
+
+            if (useDeathGodBlade)
+                DeathGodModule.DecorateAttackClone(clone, objectField);
 
             copied += SetField(targetGroup, objectField, clone);
             copied += BindAttackComponents(targetGroup, objectField, clone);
@@ -257,7 +266,7 @@ public sealed class CharmApplier
     public bool UsesCrestFor(CharmPart part, string? crestId)
     {
         if (string.IsNullOrEmpty(crestId)) return false;
-        return string.Equals(SelectedCrestId(part), crestId, StringComparison.OrdinalIgnoreCase);
+        return DeathGodModule.MatchesRuntimeIdentity(SelectedCrestId(part), crestId);
     }
 
     private static void RefreshConfigGroup(object hero, object activeGroup)
@@ -309,6 +318,7 @@ public sealed class CharmApplier
 
     private static object? ResolveHeroConfig(string? id)
     {
+        id = DeathGodModule.RuntimeSourceId(id);
         if (string.IsNullOrEmpty(id)) return null;
         try
         {

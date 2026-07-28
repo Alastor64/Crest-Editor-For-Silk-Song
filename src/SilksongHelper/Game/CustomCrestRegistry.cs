@@ -119,10 +119,18 @@ public static class CustomCrestRegistry
 
     public static string? CustomNameFor(ToolCrest? crestData)
     {
+        return CustomCharmFor(crestData)?.Name;
+    }
+
+    public static string? CustomDescriptionFor(ToolCrest? crestData)
+        => CustomCharmFor(crestData)?.Description;
+
+    private static CustomCharm? CustomCharmFor(ToolCrest? crestData)
+    {
         if (crestData == null) return null;
         var id = IdFromSentinel(crestData.name);
         if (id == null) return null;
-        return Plugin.SaveData.Charms.FirstOrDefault(c => c.Id == id)?.Name;
+        return Plugin.SaveData.Charms.FirstOrDefault(c => c.Id == id);
     }
 
     private static void EnsureSaveData(ToolCrest clone, ToolCrest source)

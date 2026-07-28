@@ -60,6 +60,21 @@ internal static class CrestInventoryPatches
         }
     }
 
+    [HarmonyPatch(typeof(InventoryToolCrest), nameof(InventoryToolCrest.Description), MethodType.Getter)]
+    internal static class DescriptionPatch
+    {
+        internal static void Postfix(ref string __result, InventoryToolCrest __instance)
+        {
+            try
+            {
+                if (__instance == null) return;
+                var custom = CustomCrestRegistry.CustomDescriptionFor(__instance.CrestData);
+                if (custom != null) __result = custom;
+            }
+            catch (Exception e) { Plugin.Log.LogWarning($"Description postfix: {e.Message}"); }
+        }
+    }
+
     [HarmonyPatch(typeof(InventoryToolCrest), nameof(InventoryToolCrest.IsUnlocked), MethodType.Getter)]
     internal static class IsUnlockedPatch
     {

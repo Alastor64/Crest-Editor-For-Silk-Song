@@ -49,6 +49,7 @@ internal static class CrestAnimationPatches
 
     private static HeroControllerConfig? ResolveConfig(string? crestId)
     {
+        crestId = DeathGodModule.RuntimeSourceId(crestId);
         if (string.IsNullOrEmpty(crestId)) return null;
         try
         {

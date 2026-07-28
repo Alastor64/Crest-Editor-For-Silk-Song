@@ -35,12 +35,12 @@ public static class CharmPartNames
     public static readonly IReadOnlyList<CharmPart> NonSlotParts = new[]
     {
         CharmPart.NormalAttack,
-        CharmPart.HealMethod,
-        CharmPart.ChargedAttack,
-        CharmPart.DashAttack,
-        CharmPart.DownSlashJump,
-        CharmPart.PostHealEffect,
         CharmPart.UpSlash,
+        CharmPart.DownSlashJump,
+        CharmPart.DashAttack,
+        CharmPart.ChargedAttack,
+        CharmPart.HealMethod,
+        CharmPart.PostHealEffect,
         CharmPart.SpecialSkill,
     };
 
@@ -48,12 +48,12 @@ public static class CharmPartNames
     {
         CharmPart.Slot,
         CharmPart.NormalAttack,
-        CharmPart.HealMethod,
-        CharmPart.ChargedAttack,
-        CharmPart.DashAttack,
-        CharmPart.DownSlashJump,
-        CharmPart.PostHealEffect,
         CharmPart.UpSlash,
+        CharmPart.DownSlashJump,
+        CharmPart.DashAttack,
+        CharmPart.ChargedAttack,
+        CharmPart.HealMethod,
+        CharmPart.PostHealEffect,
         CharmPart.SpecialSkill,
     };
 }

@@ -1,10 +1,14 @@
+using System.Collections;
 using System.Linq;
+using HarmonyLib;
 using UnityEngine;
 
 namespace SilksongHelper;
 
 public sealed class CharmEditor : MonoBehaviour
 {
+    internal static bool IsOpen { get; private set; }
+
     private bool _visible;
     private bool _placed;
     private Rect _window = new Rect(40, 40, 880, 640);
@@ -64,6 +68,14 @@ public sealed class CharmEditor : MonoBehaviour
         if (!_visible)
             return;
 
+        if (e != null && e.type == EventType.KeyDown && e.keyCode == KeyCode.Escape)
+        {
+            e.Use();
+            _visible = false;
+            CloseEditor();
+            return;
+        }
+
         var oldDepth = GUI.depth;
         GUI.depth = -100;
 
@@ -78,6 +90,8 @@ public sealed class CharmEditor : MonoBehaviour
 
     private void OpenEditor()
     {
+        IsOpen = true;
+
         if (!_placed)
         {
             float w = Screen.width * 0.5f;
@@ -108,6 +122,8 @@ public sealed class CharmEditor : MonoBehaviour
 
     private void CloseEditor()
     {
+        IsOpen = false;
+
         if (_didPause)
         {
             Time.timeScale = _savedTimeScale;
@@ -459,5 +475,41 @@ public sealed class CharmEditor : MonoBehaviour
                 }
             }
         }
+    }
+}
+
+[HarmonyPatch(typeof(GameManager), "PauseGameToggle", typeof(bool))]
+internal static class BlockGamePauseToggleWhileCharmEditorOpenPatch
+{
+    internal static bool Prefix(ref IEnumerator __result)
+    {
+        if (!CharmEditor.IsOpen)
+            return true;
+
+        __result = EmptyPauseToggle();
+        return false;
+    }
+
+    private static IEnumerator EmptyPauseToggle()
+    {
+        yield break;
+    }
+}
+
+[HarmonyPatch(typeof(GameManager), "PauseGameToggleByMenu")]
+internal static class BlockMenuPauseToggleWhileCharmEditorOpenPatch
+{
+    internal static bool Prefix(ref IEnumerator __result)
+    {
+        if (!CharmEditor.IsOpen)
+            return true;
+
+        __result = EmptyPauseToggle();
+        return false;
+    }
+
+    private static IEnumerator EmptyPauseToggle()
+    {
+        yield break;
     }
 }

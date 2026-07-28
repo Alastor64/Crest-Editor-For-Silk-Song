@@ -60,7 +60,7 @@ public static class CrestCatalog
         _options = new Dictionary<CharmPart, List<CrestPartOption>>();
         foreach (var part in CharmPartNames.All)
         {
-            var opts = new List<CrestPartOption>();
+            var implementations = new List<CrestInfo>();
             foreach (var c in list)
             {
                 if (part != CharmPart.Slot
@@ -68,10 +68,141 @@ public static class CrestCatalog
                     && c.HeroConfig == null
                     && !UsesDefaultHeroConfig(c.Id))
                     continue;
-                opts.Add(BuildOption(c, part));
+
+                int duplicate = implementations.FindIndex(
+                    existing => SameImplementation(part, existing, c));
+                if (duplicate < 0)
+                {
+                    implementations.Add(c);
+                }
+                else if (RepresentativePreference(part, c)
+                         > RepresentativePreference(part, implementations[duplicate]))
+                {
+                    implementations[duplicate] = c;
+                }
             }
-            _options[part] = opts;
+
+            _options[part] = implementations.Select(c => BuildOption(c, part)).ToList();
+            Plugin.Log.LogInfo(
+                $"crest options {part}: {list.Count} crests -> {_options[part].Count} distinct implementations.");
         }
+    }
+
+    /// <summary>
+    /// Returns true when two crest choices execute the same implementation for
+    /// one editor module. This also lets old saves that reference a now-hidden
+    /// duplicate remain visibly selected in both editor UIs.
+    /// </summary>
+    public static bool AreEquivalent(CharmPart part, string? firstId, string? secondId)
+    {
+        if (string.Equals(firstId, secondId, StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (string.IsNullOrEmpty(firstId) || string.IsNullOrEmpty(secondId))
+            return false;
+
+        var first = ById(firstId);
+        var second = ById(secondId);
+        return first != null && second != null && SameImplementation(part, first, second);
+    }
+
+    private static bool SameImplementation(CharmPart part, CrestInfo first, CrestInfo second)
+    {
+        if (part == CharmPart.Slot)
+            return string.Equals(first.Id, second.Id, StringComparison.OrdinalIgnoreCase);
+
+        if (PartBehaviour.UsesCrestIdentity(part))
+        {
+            return string.Equals(
+                IdentityImplementationKey(part, first.Id),
+                IdentityImplementationKey(part, second.Id),
+                StringComparison.Ordinal);
+        }
+
+        // The three Hunter assets deliberately have no HeroConfig and all fall
+        // back to HeroController's same default ConfigGroup.
+        if (UsesDefaultHeroConfig(first.Id) && UsesDefaultHeroConfig(second.Id))
+            return true;
+
+        // Cursed and Witch share the exact Whip HeroConfig. More generally,
+        // sharing the same live config also means sharing module fields,
+        // animation overrides, and the ConfigGroup attack objects copied by
+        // CharmApplier.
+        return first.HeroConfig != null
+               && second.HeroConfig != null
+               && ReferenceEquals(first.HeroConfig, second.HeroConfig);
+    }
+
+    private static string IdentityImplementationKey(CharmPart part, string id)
+    {
+        string normalized = id.ToLowerInvariant();
+        bool known = IsKnownCrest(normalized);
+
+        switch (part)
+        {
+            case CharmPart.HealMethod:
+                // Only these identities add behaviour beyond the config fields:
+                // Witch changes bind cost/silk gain, Spell changes landing, and
+                // Warrior uses the safe custom attack-heal implementation.
+                if (normalized == "witch"
+                    || normalized == "spell"
+                    || normalized == "warrior"
+                    || normalized == "cloakless")
+                    return $"heal:{normalized}";
+                return known ? "heal:standard" : $"heal:{normalized}";
+
+            case CharmPart.PostHealEffect:
+                if (normalized == "warrior" || normalized == "reaper")
+                    return $"post-heal:{normalized}";
+                return known ? "post-heal:none" : $"post-heal:{normalized}";
+
+            case CharmPart.SpecialSkill:
+                if (IsHunterId(normalized)
+                    || normalized == "toolmaster"
+                    || normalized == "spell"
+                    || normalized == "wanderer")
+                    return $"special:{normalized}";
+                return known ? "special:none" : $"special:{normalized}";
+
+            default:
+                return $"{part}:{normalized}";
+        }
+    }
+
+    private static bool IsKnownCrest(string normalized)
+        => normalized == "cloakless"
+           || normalized == "cursed"
+           || normalized == "curse"
+           || IsHunterId(normalized)
+           || normalized == "reaper"
+           || normalized == "spell"
+           || normalized == "toolmaster"
+           || normalized == "wanderer"
+           || normalized == "warrior"
+           || normalized == "witch";
+
+    private static bool IsHunterId(string normalized)
+        => normalized == "hunter" || normalized.StartsWith("hunter_", StringComparison.Ordinal);
+
+    private static int RepresentativePreference(CharmPart part, CrestInfo crest)
+    {
+        string id = crest.Id.ToLowerInvariant();
+
+        if (part == CharmPart.HealMethod && id == "wanderer")
+            return 100;
+        if (part == CharmPart.PostHealEffect && id == "wanderer")
+            return 100;
+        if (part == CharmPart.SpecialSkill && id == "witch")
+            return 100;
+
+        if (!PartBehaviour.UsesCrestIdentity(part))
+        {
+            if (id == "witch" || id == "hunter")
+                return 100;
+            if (id == "cursed" || id == "curse" || IsHunterId(id))
+                return -100;
+        }
+
+        return 0;
     }
 
     private static CrestPartOption BuildOption(CrestInfo crest, CharmPart part)
@@ -84,11 +215,20 @@ public static class CrestCatalog
         return new CrestPartOption
         {
             CrestId = crest.Id,
-            CrestName = crest.Name,
+            CrestName = OptionDisplayName(crest),
             Part = part,
             Summary = summary,
             Preview = preview,
         };
+    }
+
+    private static string OptionDisplayName(CrestInfo crest)
+    {
+        if (crest.Id.Equals("Hunter_v2", StringComparison.OrdinalIgnoreCase))
+            return $"{crest.Name}（二阶）";
+        if (crest.Id.Equals("Hunter_v3", StringComparison.OrdinalIgnoreCase))
+            return $"{crest.Name}（三阶）";
+        return crest.Name;
     }
 
     private static string Summarize(object? config, CharmPart part)

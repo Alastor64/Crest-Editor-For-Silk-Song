@@ -467,8 +467,10 @@ public sealed class CharmWorkshopUI : MonoBehaviour
         var capturedId = crestId;
         btn.onClick.AddListener(() =>
         {
-            bool isSelected = (part == CharmPart.Slot && _work.SlotCrestId == capturedId) ||
-                              (part != CharmPart.Slot && _work.PartCrestIds.TryGetValue(part.ToString(), out var cid) && cid == capturedId);
+            bool isSelected = part == CharmPart.Slot
+                ? CrestCatalog.AreEquivalent(part, _work.SlotCrestId, capturedId)
+                : _work.PartCrestIds.TryGetValue(part.ToString(), out var cid)
+                  && CrestCatalog.AreEquivalent(part, cid, capturedId);
             onSelect(isSelected ? null : capturedId);
             RefreshCardButton(btn, capturedId, part);
             RefreshAllCardButtons(part);
@@ -481,8 +483,10 @@ public sealed class CharmWorkshopUI : MonoBehaviour
     {
         var txt = btn.GetComponentInChildren<Text>();
         if (txt == null) return;
-        bool isSelected = (part == CharmPart.Slot && _work.SlotCrestId == crestId) ||
-                          (part != CharmPart.Slot && _work.PartCrestIds.TryGetValue(part.ToString(), out var cid) && cid == crestId);
+        bool isSelected = part == CharmPart.Slot
+            ? CrestCatalog.AreEquivalent(part, _work.SlotCrestId, crestId)
+            : _work.PartCrestIds.TryGetValue(part.ToString(), out var cid)
+              && CrestCatalog.AreEquivalent(part, cid, crestId);
         txt.text = isSelected ? "已选" : "选择";
         var bgColor = isSelected ? new Color(0.25f, 0.55f, 0.25f) : new Color(0.2f, 0.2f, 0.25f);
         var btnImg = btn.GetComponent<Image>();

@@ -399,7 +399,7 @@ public sealed class CharmEditor : MonoBehaviour
                 {
                     foreach (var opt in CrestCatalog.Options(part))
                     {
-                        bool sel = opt.CrestId == current;
+                        bool sel = CrestCatalog.AreEquivalent(part, opt.CrestId, current);
                         var old = GUI.color;
                         GUI.color = sel ? new Color(0.65f, 1f, 0.65f) : Color.white;
                         using (new GUILayout.VerticalScope("box", GUILayout.Width(72)))

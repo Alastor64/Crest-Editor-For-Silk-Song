@@ -13,6 +13,7 @@ public static class CustomCrestRegistry
     private static readonly Dictionary<string, ToolCrest> _byName = new();
     private static readonly Dictionary<string, ToolCrestsData.Data> _fallbackSaveData = new();
     private static bool _dirty = true;
+    private static bool _building;
 
     public static void MarkDirty() => _dirty = true;
 
@@ -25,39 +26,77 @@ public static class CustomCrestRegistry
 
     public static void EnsureBuilt()
     {
-        if (!_dirty) return;
-        _dirty = false;
-        var liveCrestList = ResolveLiveCrestList();
-        foreach (var obj in _byName.Values)
+        if (!_dirty || _building) return;
+        _building = true;
+        try
         {
-            try
+            var liveCrestList = ResolveLiveCrestList();
+            foreach (var obj in _byName.Values)
             {
-                if (obj == null) continue;
-                liveCrestList?.Remove(obj);
-                UnityEngine.Object.Destroy(obj);
+                try
+                {
+                    if (obj == null) continue;
+                    liveCrestList?.Remove(obj);
+                    UnityEngine.Object.Destroy(obj);
+                }
+                catch { }
             }
-            catch { }
-        }
-        _byName.Clear();
-        _fallbackSaveData.Clear();
+            _byName.Clear();
+            _fallbackSaveData.Clear();
 
-        foreach (var charm in Plugin.SaveData.Charms)
+            var definitions = Plugin.SaveData.Charms
+                .Select(charm => Plugin.Applier.DefinitionForRegistry(charm))
+                .ToList();
+            var active = Plugin.Applier.ActiveCharm;
+            if (active != null && definitions.All(charm => charm.Id != active.Id))
+                definitions.Add(active);
+
+            foreach (var charm in definitions)
+            {
+                var src = ResolveSlotCrest(charm.SlotCrestId);
+                if (src is not ToolCrest crest) continue;
+                try
+                {
+                    var clone = UnityEngine.Object.Instantiate(crest);
+                    clone.name = SentinelFor(charm.Id);
+                    NormalizeSyntheticCrest(clone);
+                    EnsureSaveData(clone, crest);
+                    _byName[clone.name] = clone;
+                    if (liveCrestList != null && !liveCrestList.Contains(clone))
+                        liveCrestList.Add(clone);
+                }
+                catch (Exception e)
+                {
+                    Plugin.Log.LogWarning($"build synthetic crest for '{charm.Name}': {e}");
+                }
+            }
+
+            _dirty = false;
+            Plugin.Log.LogInfo($"custom crest registry rebuilt: {_byName.Count} crest(s).");
+        }
+        finally
         {
-            var src = ResolveSlotCrest(charm.SlotCrestId);
-            if (src is not ToolCrest crest) continue;
-            try
-            {
-                var clone = UnityEngine.Object.Instantiate(crest);
-                clone.name = SentinelFor(charm.Id);
-                EnsureSaveData(clone, crest);
-                _byName[clone.name] = clone;
-                if (liveCrestList != null && !liveCrestList.Contains(clone))
-                    liveCrestList.Add(clone);
-            }
-            catch (Exception e) { Plugin.Log.LogWarning($"build synthetic crest for '{charm.Name}': {e}"); }
+            _building = false;
         }
+    }
 
-        Plugin.Log.LogInfo($"custom crest registry rebuilt: {_byName.Count} crest(s).");
+    private static void NormalizeSyntheticCrest(ToolCrest clone)
+    {
+        var type = typeof(ToolCrest);
+        AccessTools.Field(type, "isHidden")?.SetValue(clone, false);
+        AccessTools.Field(type, "previousVersion")?.SetValue(clone, null);
+        AccessTools.Field(type, "upgradedVersion")?.SetValue(clone, null);
+        AccessTools.Field(type, "oldPreviousVersion")?.SetValue(clone, null);
+        AccessTools.Field(type, "hasCustomAction")?.SetValue(clone, false);
+
+        var customButton = AccessTools.Field(type, "customButtonCombo");
+        if (customButton != null)
+        {
+            var empty = customButton.FieldType.IsValueType
+                ? Activator.CreateInstance(customButton.FieldType)
+                : null;
+            customButton.SetValue(clone, empty);
+        }
     }
 
     private static ToolCrestList? ResolveLiveCrestList()

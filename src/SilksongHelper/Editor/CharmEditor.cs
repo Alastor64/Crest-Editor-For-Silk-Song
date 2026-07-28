@@ -371,6 +371,7 @@ public sealed class CharmEditor : MonoBehaviour
                 _nameBuf = GUILayout.TextField(_nameBuf, 24, GUILayout.Width(200));
                 GUILayout.Label(_work.IsComplete ? "组合完整" : "组合未完成",
                     _work.IsComplete ? Bold : Red, GUILayout.Width(96));
+                GUILayout.Label("保存后需重新装备才生效", Small, GUILayout.Width(180));
                 GUILayout.FlexibleSpace();
                 if (GUILayout.Button("新建", GUILayout.Width(60)))
                 {
@@ -385,7 +386,6 @@ public sealed class CharmEditor : MonoBehaviour
                     Plugin.SaveData.Upsert(_work);
                     Plugin.SaveData.Save();
                     CustomCrestRegistry.MarkDirty();
-                    Plugin.Applier.ReapplyNow(_work);
                 }
             }
 

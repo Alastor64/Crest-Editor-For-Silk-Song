@@ -23,8 +23,16 @@ public sealed class CharmApplier
     {
         if (_isApplying) return;
 
+        // Repeated resets while the same sentinel remains equipped must replay
+        // the definition captured at equip time. A later Save becomes active
+        // only after an explicit inventory equip action invalidates it.
+        var equippedSnapshot = string.Equals(_activeId, charm.Id, StringComparison.Ordinal)
+                               && _activeCharm != null
+            ? _activeCharm
+            : charm.Clone();
+
         _isApplying = true;
-        try { ApplyOverridesCore(charm, hero); }
+        try { ApplyOverridesCore(equippedSnapshot, hero); }
         finally { _isApplying = false; }
     }
 
@@ -32,7 +40,7 @@ public sealed class CharmApplier
     {
         // ResetAllCrestState can run more than once while the same crest remains
         // equipped. Always rebuild the composition after vanilla resets it.
-        RestoreOverrides();
+        RestoreOverrides(hero);
 
         var active = AccessTools.Property(hero.GetType(), "CurrentConfigGroup")?.GetValue(hero);
         if (active == null)
@@ -80,15 +88,21 @@ public sealed class CharmApplier
         Plugin.Log.LogInfo($"applied custom charm overrides '{charm.Name}' ({applied} fields).");
     }
 
-    public void ReapplyNow(CustomCharm charm)
+    internal CustomCharm DefinitionForRegistry(CustomCharm saved)
     {
-        if (ActiveCharmId != charm.Id) return;
-        _activeId = null;
-        var hero = ResolveHero();
-        if (hero != null) ApplyOverrides(charm, hero);
+        return string.Equals(_activeId, saved.Id, StringComparison.Ordinal)
+               && _activeCharm != null
+            ? _activeCharm
+            : saved;
     }
 
-    public void RestoreOverrides()
+    internal void UseLatestDefinitionOnNextApply()
+    {
+        _activeId = null;
+        _activeCharm = null;
+    }
+
+    public void RestoreOverrides(object? hero = null)
     {
         if (_activeId == null && _originals.Count == 0) return;
         foreach (var (target, field, value) in _originals)
@@ -101,6 +115,17 @@ public sealed class CharmApplier
             catch (Exception e) { Plugin.Log.LogWarning($"restore {field}: {e.Message}"); }
         }
         _originals.Clear();
+
+        // Vanilla can reset to the same base ConfigGroup that was previously
+        // composed. Refresh its private slash/downspike caches before the
+        // custom clones they used are destroyed.
+        if (hero != null)
+        {
+            var active = AccessTools.Property(hero.GetType(), "CurrentConfigGroup")?.GetValue(hero);
+            if (active != null)
+                RefreshConfigGroup(hero, active);
+        }
+
         foreach (var clone in _attackObjectClones.Values)
         {
             try
@@ -137,8 +162,8 @@ public sealed class CharmApplier
         CharmPart part,
         string sourceCrestId)
     {
-        bool useDeathGodEffect = DeathGodModule.UsesDoubleDownSlashEffect(part, sourceCrestId);
-        if (ReferenceEquals(targetGroup, sourceGroup) && !useDeathGodEffect)
+        bool useDeathGodScale = DeathGodModule.UsesDoubleDownSlash(part, sourceCrestId);
+        if (ReferenceEquals(targetGroup, sourceGroup) && !useDeathGodScale)
             return 0;
 
         var targetRoot = GetMember(targetGroup, "ActiveRoot") as GameObject;
@@ -172,8 +197,8 @@ public sealed class CharmApplier
                     $"cloned attack object {sourceObject.name} for {CharmPartNames.Display(part)}.");
             }
 
-            if (useDeathGodEffect)
-                DeathGodModule.DecorateDownSlashClone(clone);
+            if (useDeathGodScale)
+                DeathGodModule.ScaleDownSlashClone(clone);
 
             copied += SetField(targetGroup, objectField, clone);
             copied += BindAttackComponents(targetGroup, objectField, clone);
@@ -269,7 +294,7 @@ public sealed class CharmApplier
         return DeathGodModule.MatchesRuntimeIdentity(SelectedCrestId(part), crestId);
     }
 
-    private static void RefreshConfigGroup(object hero, object activeGroup)
+    internal static void RefreshConfigGroup(object hero, object activeGroup)
     {
         try
         {
@@ -325,7 +350,7 @@ public sealed class CharmApplier
             var mi = AccessTools.Method(typeof(ToolItemManager), nameof(ToolItemManager.GetCrestByName));
             if (mi?.Invoke(null, new object?[] { id }) is ToolCrest c)
             {
-                var hc = GetMember(c, "HeroConfig");
+                var hc = c.HeroConfig;
                 if (hc != null) return hc;
             }
         }
@@ -335,11 +360,18 @@ public sealed class CharmApplier
 
     private static object? GetMember(object obj, string name)
     {
-        var t = obj.GetType();
-        var f = AccessTools.Field(t, name);
-        if (f != null) return f.GetValue(obj);
-        var p = AccessTools.Property(t, name);
-        return p != null && p.CanRead ? p.GetValue(obj, null) : null;
+        const BindingFlags flags =
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+        for (Type? type = obj.GetType(); type != null; type = type.BaseType)
+        {
+            var property = type.GetProperty(name, flags);
+            if (property != null && property.CanRead)
+                return property.GetValue(obj, null);
+            var field = type.GetField(name, flags);
+            if (field != null)
+                return field.GetValue(obj);
+        }
+        return null;
     }
 
     private void DumpCompositionDiagnostics(CustomCharm charm, IReadOnlyList<object> groups)

@@ -282,7 +282,20 @@ internal static class MenuIntegration
         internal static bool Prefix(PauseMenuButton __instance)
         {
             if (__instance.name == "CrestWorkshopPauseBtn")
-                return false;
+            {
+                try
+                {
+                    // Consume only the Escape/Cancel used to close the workshop.
+                    // Once it is hidden, the next Cancel must reach the original
+                    // PauseMenuButton so the game can leave the pause menu.
+                    if (WorkshopUI?.TryConsumePauseMenuCancel() == true)
+                        return false;
+                }
+                catch (Exception e)
+                {
+                    Plugin.Log.LogWarning($"[MenuIntegration] 处理纹章工坊取消输入失败: {e}");
+                }
+            }
             return true;
         }
     }

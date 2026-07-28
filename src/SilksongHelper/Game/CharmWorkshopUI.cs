@@ -26,6 +26,7 @@ public sealed class CharmWorkshopUI : MonoBehaviour
     private Font? _gameFont;
     private float _prevTimeScale = 1f;
     private bool _didPause;
+    private int _pauseCancelConsumedFrame = -1;
 
     private void Awake()
     {
@@ -72,6 +73,21 @@ public sealed class CharmWorkshopUI : MonoBehaviour
         else Show();
     }
 
+    internal bool TryConsumePauseMenuCancel()
+    {
+        if (IsVisible)
+        {
+            _pauseCancelConsumedFrame = Time.frameCount;
+            Hide();
+            return true;
+        }
+
+        // Script Update order is not guaranteed. If this component already
+        // handled Escape this frame, do not let the same key press also close
+        // the underlying pause menu.
+        return _pauseCancelConsumedFrame == Time.frameCount;
+    }
+
     private void Update()
     {
         if (!IsVisible) return;
@@ -81,6 +97,7 @@ public sealed class CharmWorkshopUI : MonoBehaviour
 
         if (Input.GetKeyDown(KeyCode.Escape))
         {
+            _pauseCancelConsumedFrame = Time.frameCount;
             Hide();
             return;
         }
